@@ -1,0 +1,64 @@
+{% extends 'print/_base_document.html' %}
+{% block title %}Customer Ledger — {{ customer['name'] }}{% endblock %}
+{% block doc_title %}CUSTOMER LEDGER{% endblock %}
+
+{% block parties %}
+<div class="cols">
+  <div class="box">
+    <div class="box-title">Customer</div>
+    <div class="box-line"><strong>{{ customer['name'] }}</strong></div>
+    {% if customer['address'] %}<div class="box-line">{{ customer['address'] }}</div>{% endif %}
+    <div class="box-line">{{ (customer['city'] or '') }}{% if customer['state'] %}, {{ customer['state'] }}{% endif %}{% if customer['pincode'] %} - {{ customer['pincode'] }}{% endif %}</div>
+    <div class="box-line">{{ (customer['country'] or '') }}</div>
+    {% if customer['email'] %}<div class="box-line">Email: {{ customer['email'] }}</div>{% endif %}
+    {% if customer['mobile'] %}<div class="box-line">Mobile: {{ customer['mobile'] }}</div>{% endif %}
+    {% if customer['phone'] %}<div class="box-line">Phone: {{ customer['phone'] }}</div>{% endif %}
+  </div>
+  <div class="box">
+    <div class="box-line"><strong>As of:</strong> {{ as_of }}</div>
+  </div>
+</div>
+{% endblock %}
+
+{% block table_headers %}
+  <th class="col-sno">#</th>
+  <th>Date</th>
+  <th>Type</th>
+  <th>Reference</th>
+  <th>Notes</th>
+  <th class="col-num">Debit (₹)</th>
+  <th class="col-num">Credit (₹)</th>
+  <th class="col-num">Balance (₹)</th>
+{% endblock %}
+
+{% block table_rows %}
+  {% for r in ledger %}
+  <tr>
+    <td class="right">{{ loop.index }}</td>
+    <td>{{ r['date'] or '' }}</td>
+    <td>{{ r['txn_type'] }}</td>
+    <td>{{ r['reference'] or '' }}</td>
+    <td>{{ r['notes'] or '' }}</td>
+    <td class="right">{{ '%.2f'|format(r['debit'] or 0) }}</td>
+    <td class="right">{{ '%.2f'|format(r['credit'] or 0) }}</td>
+    <td class="right">{{ '%.2f'|format(r['balance'] or 0) }}</td>
+  </tr>
+  {% endfor %}
+{% endblock %}
+
+{% block summary_rows %}
+  <tr>
+    <td class="label">Total Debit</td><td class="amount" colspan="7">₹ {{ '%.2f'|format(total_debit or 0) }}</td>
+  </tr>
+  <tr>
+    <td class="label">Total Credit</td><td class="amount" colspan="7">₹ {{ '%.2f'|format(total_credit or 0) }}</td>
+  </tr>
+  <tr class="grand">
+    <td class="label">Balance</td><td class="amount" colspan="7">₹ {{ '%.2f'|format(balance or 0) }}</td>
+  </tr>
+{% endblock %}
+
+{% block notes %}
+  <div class="box-title" style="margin-top:8px">Notes</div>
+  <div>This ledger summarizes confirmed invoices and recorded payments for the selected customer.</div>
+{% endblock %}

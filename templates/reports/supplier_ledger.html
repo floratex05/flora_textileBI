@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Supplier Ledger — {{ supplier['name'] }}</title>
+  <style>
+    body { font-family: Arial, sans-serif; background:#f4f4f4; margin:0 }
+    .container { max-width: 1100px; margin: 20px auto; background:#fff; padding:20px; border-radius:6px; box-shadow:0 1px 6px rgba(0,0,0,0.08) }
+    table { width:100%; border-collapse:collapse }
+    th, td { padding:8px; border-bottom:1px solid #eee; text-align:left }
+    .topnav{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+    a.button { display:inline-block; padding:8px 12px; background:#333; color:#fff; text-decoration:none; border-radius:4px; }
+    .right { text-align:right }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="topnav">
+      <div>
+        <h2 style="margin:0">Supplier Ledger — {{ supplier['name'] }}</h2>
+        <div style="color:#666;font-size:13px">{{ supplier['address'] or '' }}, {{ supplier['city'] or '' }}, {{ supplier['state'] or '' }} {{ supplier['pincode'] or '' }}</div>
+      </div>
+      <div>
+        <a href="/" class="button" style="background:#4CAF50">Dashboard</a>
+        <a href="/reports/supplier-outstanding" class="button">Outstanding</a>
+        <a href="/print/supplier-ledger/{{ supplier['id'] }}" class="button" style="background:#2196F3">Print</a>
+        <a href="/pdf/supplier-ledger/{{ supplier['id'] }}" class="button" style="background:#9C27B0">PDF</a>
+        <a href="/logout" class="button" style="background:#f44336">Logout</a>
+      </div>
+    </div>
+
+    <div style="margin-bottom:10px; display:flex; gap:16px; align-items:center; flex-wrap:wrap">
+      <div>
+        <strong>Total Debit:</strong> {{ '%.2f'|format(total_debit or 0) }} •
+        <strong>Total Credit:</strong> {{ '%.2f'|format(total_credit or 0) }} •
+        <strong>Remaining Balance:</strong> {{ '%.2f'|format(balance or 0) }}
+      </div>
+      {% if outstanding_pis and outstanding_pis|length > 0 %}
+      <form method="GET" action="" onsubmit="if (!this.pi_id.value) { alert('Select an invoice'); return false; }" style="display:flex; gap:8px; align-items:center">
+        <label for="pi_id" style="font-size:13px;color:#333">Add Payment to:</label>
+        <select id="pi_id" name="pi_id" onchange="if (this.value) { window.location.href = '/purchase-invoices/' + this.value + '/payments/new'; }">
+          <option value="">Select outstanding PI…</option>
+          {% for inv in outstanding_pis %}
+            <option value="{{ inv['id'] }}">{{ inv['pi_no'] or ('PI#' ~ inv['id']) }} — ₹ {{ '%.2f'|format(inv['balance'] or 0) }}</option>
+          {% endfor %}
+        </select>
+        <a class="button" href="/purchase-invoices/{{ outstanding_pis[0]['id'] }}/payments/new" onclick="const sel=document.getElementById('pi_id'); if (sel && sel.value) { this.href='/purchase-invoices/'+sel.value+'/payments/new'; } else { alert('Select an invoice'); return false; }">+ Add Payment</a>
+      </form>
+      {% endif %}
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Type</th>
+          <th>Reference</th>
+          <th>Notes</th>
+          <th class="right">Debit</th>
+          <th class="right">Credit</th>
+          <th class="right">Balance</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in ledger %}
+        <tr>
+          <td>{{ r['date'] or '' }}</td>
+          <td>{{ r['txn_type'] }}</td>
+          <td>{{ r['reference'] }}</td>
+          <td>{{ r['notes'] or '' }}</td>
+          <td class="right">{{ '%.2f'|format(r['debit'] or 0) }}</td>
+          <td class="right">{{ '%.2f'|format(r['credit'] or 0) }}</td>
+          <td class="right">{{ '%.2f'|format(r['balance'] or 0) }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7">No transactions.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</body>
+</html>

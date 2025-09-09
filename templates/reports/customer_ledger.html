@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Customer Ledger — {{ customer['name'] }}</title>
+  <style>
+    body { font-family: Arial, sans-serif; background:#f4f4f4; margin:0 }
+    .container { max-width: 1200px; margin: 20px auto; background:#fff; padding:20px; border-radius:6px; box-shadow:0 1px 6px rgba(0,0,0,0.08); }
+    h1 { margin:0 0 16px; }
+    table { width:100%; border-collapse: collapse; }
+    th, td { padding: 8px; border-bottom:1px solid #eee; text-align:left; }
+    .right { text-align:right }
+    a.button { display:inline-block; padding:8px 12px; background:#333; color:#fff; text-decoration:none; border-radius:4px; }
+    .topnav{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="topnav">
+      <h1>Customer Ledger — {{ customer['name'] }}</h1>
+      <div>
+        <a href="/reports/outstanding" class="button">Outstanding</a>
+        <a href="/print/customer-ledger/{{ customer['id'] }}" class="button" style="background:#2196F3">Print</a>
+        <a href="/pdf/customer-ledger/{{ customer['id'] }}" class="button" style="background:#9C27B0">PDF</a>
+        <a href="/" class="button" style="background:#4CAF50">Dashboard</a>
+        <a href="/logout" class="button" style="background:#f44336">Logout</a>
+      </div>
+    </div>
+
+    <div style="margin-bottom:10px; display:flex; gap:16px; align-items:center; flex-wrap:wrap">
+      <div>
+        <strong>Total Debit:</strong> {{ '%.2f'|format(total_debit or 0) }} •
+        <strong>Total Credit:</strong> {{ '%.2f'|format(total_credit or 0) }} •
+        <strong>Remaining Balance:</strong> {{ '%.2f'|format(balance or 0) }}
+      </div>
+      {% if outstanding_invoices and outstanding_invoices|length > 0 %}
+      <form method="GET" action="" onsubmit="if (!this.si_id.value) { alert('Select an invoice'); return false; }" style="display:flex; gap:8px; align-items:center">
+        <label for="si_id" style="font-size:13px;color:#333">Add Payment to:</label>
+        <select id="si_id" name="si_id" onchange="if (this.value) { window.location.href = '/sales-invoices/' + this.value + '/payments/new'; }">
+          <option value="">Select outstanding invoice…</option>
+          {% for inv in outstanding_invoices %}
+            <option value="{{ inv['id'] }}">{{ inv['si_no'] or ('SI#' ~ inv['id']) }} — ₹ {{ '%.2f'|format(inv['balance'] or 0) }}</option>
+          {% endfor %}
+        </select>
+        <a class="button" href="/sales-invoices/{{ outstanding_invoices[0]['id'] }}/payments/new" onclick="const sel=document.getElementById('si_id'); if (sel && sel.value) { this.href='/sales-invoices/'+sel.value+'/payments/new'; } else { alert('Select an invoice'); return false; }">+ Add Payment</a>
+      </form>
+      {% endif %}
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Type</th>
+          <th>Reference</th>
+          <th>Notes</th>
+          <th class="right">Debit</th>
+          <th class="right">Credit</th>
+          <th class="right">Running Balance</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in ledger %}
+        <tr>
+          <td>{{ r['date'] or '' }}</td>
+          <td>{{ r['txn_type'] }}</td>
+          <td>{{ r['reference'] or '' }}</td>
+          <td>{{ r['notes'] or '' }}</td>
+          <td class="right">{{ '%.2f'|format(r['debit'] or 0) }}</td>
+          <td class="right">{{ '%.2f'|format(r['credit'] or 0) }}</td>
+          <td class="right">{{ '%.2f'|format(r['balance'] or 0) }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7">No transactions.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</body>
+</html>

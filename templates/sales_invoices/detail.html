@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sales Invoice #{{ si['id'] }}</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f4f4f4; margin:0; }
+    .container { max-width: 1000px; margin: 20px auto; background:#fff; padding:20px; border-radius:6px; box-shadow:0 1px 6px rgba(0,0,0,0.08); }
+    h1 { margin:0 0 16px; }
+    table { width:100%; border-collapse: collapse; }
+    th, td { padding: 8px; border-bottom:1px solid #eee; text-align:left; }
+    a.button { display:inline-block; padding:8px 12px; background:#333; color:#fff; text-decoration:none; border-radius:4px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Sales Invoice #{{ si['id'] }} — {{ si['si_no'] or '' }}</h1>
+    <div>Customer: <strong>{{ si['customer_name'] }}</strong></div>
+    <div>Date: <strong>{{ si['date'] or '' }}</strong></div>
+    <div>Status: <strong>{{ si['status'] or 'draft' }}</strong></div>
+
+    <h3>Line Items</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Item</th>
+          <th>Qty</th>
+          <th>HSN</th>
+          <th>Rate</th>
+          <th>Discount (%)</th>
+          <th>Line Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for li in lines %}
+        <tr>
+          <td>{{ li['item_name'] }}</td>
+          <td>{{ '%.2f'|format(li['qty'] or 0) }}</td>
+          <td>{{ li['hsn_code'] or '' }}</td>
+          <td>{{ '%.2f'|format(li['rate'] or 0) }}</td>
+          <td>{{ '%.2f'|format(li['discount'] or 0) }}</td>
+          <td>{{ '%.2f'|format(li['line_total'] or 0) }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5">No lines</td></tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr>
+          <td colspan="3"></td>
+          <td style="text-align:right">Totals</td>
+          <td>{{ '%.2f'|format(si['grand_total'] or 0) }}</td>
+        </tr>
+      </tfoot>
+    </table>
+
+    <div style="margin-top:12px; display:flex; gap:8px; align-items:center">
+      <a class="button" href="/sales-invoices">Back</a>
+      {% if (si['status'] or 'draft') == 'draft' %}
+        <a class="button" href="/sales-invoices/{{ si['id'] }}/edit" style="background:#FF9800">Edit</a>
+        <form method="POST" action="/sales-invoices/{{ si['id'] }}/confirm" onsubmit="return confirm('Confirm this invoice and apply stock OUT?');" style="display:inline">
+          <button type="submit" class="button" style="background:#4CAF50">Confirm</button>
+        </form>
+        <form method="POST" action="/sales-invoices/{{ si['id'] }}/cancel" onsubmit="return confirm('Cancel this draft invoice?');" style="display:inline">
+          <button type="submit" class="button" style="background:#f44336">Cancel</button>
+        </form>
+      {% elif (si['status'] or '') == 'confirmed' %}
+        <a class="button" href="/print/sales-invoice/{{ si['id'] }}" style="background:#2196F3">Print</a>
+        <a class="button" href="/pdf/sales-invoice/{{ si['id'] }}" style="background:#9C27B0">PDF</a>
+        <a class="button" href="/print/packing-slip/{{ si['id'] }}" style="background:#3f51b5">Packing Slip</a>
+        <a class="button" href="/pdf/packing-slip/{{ si['id'] }}" style="background:#3949ab">Packing Slip PDF</a>
+        <a class="button" href="/delivery-notes/new?from_si={{ si['id'] }}" style="background:#009688">Create Delivery Note</a>
+        <a class="button" href="/reports/customer-ledger/{{ si['customer_id'] }}" style="background:#607D8B">Customer Ledger</a>
+        <form method="POST" action="/sales-invoices/{{ si['id'] }}/cancel" onsubmit="return confirm('Cancel this confirmed invoice? This will restore stock.');" style="display:inline">
+          <button type="submit" class="button" style="background:#e53935">Cancel</button>
+        </form>
+      {% endif %}
+    </div>
+
+    {% if (si['status'] or '') == 'confirmed' %}
+    <h3 style="margin-top:24px">Payments</h3>
+    <div style="display:flex; gap:20px; align-items:flex-start; flex-wrap:wrap">
+      <div>
+        <div style="margin-bottom:8px">
+          <a class="button" href="/sales-invoices/{{ si['id'] }}/payments/new" style="background:#4CAF50">+ Add Payment</a>
+        </div>
+        <div><strong>Total:</strong> {{ '%.2f'|format(si['grand_total'] or 0) }}</div>
+        <div><strong>Paid:</strong> {{ '%.2f'|format(paid_total or 0) }}</div>
+        <div><strong>Remaining Balance:</strong> {{ '%.2f'|format(balance or 0) }}</div>
+        <table style="margin-top:10px; min-width:500px">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Mode</th>
+              <th>Reference</th>
+              <th style="text-align:right">Amount</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for p in payments %}
+            <tr>
+              <td>{{ p['date'] or '' }}</td>
+              <td>{{ p['mode'] or '' }}</td>
+              <td>{{ p['reference'] or '' }}</td>
+              <td style="text-align:right">{{ '%.2f'|format(p['amount'] or 0) }}</td>
+              <td>
+                <form method="POST" action="/sales-invoices/{{ si['id'] }}/payments/{{ p['id'] }}/delete" onsubmit="return confirm('Delete this payment?');">
+                  <button type="submit" class="button" style="background:#f44336">Delete</button>
+                </form>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5">No payments yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</body>
+</html>

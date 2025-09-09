@@ -1,0 +1,47 @@
+{% extends 'print/_base_document.html' %}
+{% block title %}Packing Slip — PR #{{ pr['id'] }}{% endblock %}
+{% block doc_title %}PACKING SLIP (Purchase Return){% endblock %}
+{% block doc_meta_rows %}{% endblock %}
+
+{% block parties %}
+<div class="cols">
+  <div class="box">
+    <div class="box-title">Return To</div>
+    <div class="box-line"><strong>{{ pr['supplier_name'] or pr['name'] }}</strong></div>
+    {% if pr['address'] %}<div class="box-line">{{ pr['address'] }}</div>{% endif %}
+    <div class="box-line">{{ (pr['city'] or '') }}{% if pr['state'] %}, {{ pr['state'] }}{% endif %}{% if pr['pincode'] %} - {{ pr['pincode'] }}{% endif %}</div>
+  </div>
+  <div class="box">
+    <div class="box-line"><strong>Return ID:</strong> {{ pr['id'] }}</div>
+    <div class="box-line"><strong>Return No:</strong> {{ pr['return_no'] or ('PR#' ~ pr['id']) }}</div>
+    <div class="box-line"><strong>Date:</strong> {{ pr['return_date'] or '-' }}</div>
+  </div>
+</div>
+{% endblock %}
+
+{% block table_headers %}
+  <th class="col-sno">#</th>
+  <th class="col-item">Item</th>
+  <th class="col-num">Qty</th>
+  <th>UOM</th>
+  <th>Notes</th>
+{% endblock %}
+
+{% block table_rows %}
+  {% for li in lines %}
+  <tr>
+    <td class="right">{{ loop.index }}</td>
+    <td>{{ li['item_name'] }}</td>
+    <td class="right">{{ '%.2f'|format(li['qty'] or 0) }}</td>
+    <td class="right">{{ li['uom'] or 'Nos' }}</td>
+    <td></td>
+  </tr>
+  {% endfor %}
+{% endblock %}
+
+{% block summary_rows %}{% endblock %}
+{% block notes %}{% endblock %}
+{% block signatures %}
+  <div class="sig">Packed By</div>
+  <div class="sig right">Checked By</div>
+{% endblock %}

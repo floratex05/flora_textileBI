@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 0; }
+        .container { max-width: 800px; margin: 0 auto; padding: 20px; }
+        .header { display: flex; justify-content: space-between; align-items: center; background-color: #333; color: white; padding: 10px 20px; }
+        .welcome { font-size: 18px; }
+        .logout { background-color: #f44336; color: white; border: none; padding: 8px 16px; text-decoration: none; border-radius: 4px; }
+        .content { background-color: white; padding: 20px; border-radius: 5px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); margin-top: 20px; }
+        h1 { color: #333; }
+        .flash-messages { margin-bottom: 15px; }
+        .flash-message { padding: 10px; background-color: #d4edda; color: #155724; border-radius: 4px; margin-bottom: 5px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="welcome">Welcome, {{ name }}!</div>
+        <a href="{{ url_for('logout') }}" class="logout">Logout</a>
+    </div>
+    
+    <div class="container">
+        {% with messages = get_flashed_messages() %}
+        {% if messages %}
+        <div class="flash-messages">
+            {% for message in messages %}
+            <div class="flash-message">{{ message }}</div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% endwith %}
+        
+        <div class="content">
+            <h1>Dashboard</h1>
+            <p>This is your protected dashboard page. You can only see this if you're logged in.</p>
+
+            <h3>Key metrics</h3>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px">
+                <div style="background:#fafafa;padding:12px;border:1px solid #eee;border-radius:6px">
+                    <div style="font-size:12px;color:#777">Customers</div>
+                    <div style="font-size:22px;font-weight:bold">{{ analytics.counts.customers }}</div>
+                </div>
+                <div style="background:#fafafa;padding:12px;border:1px solid #eee;border-radius:6px">
+                    <div style="font-size:12px;color:#777">Suppliers</div>
+                    <div style="font-size:22px;font-weight:bold">{{ analytics.counts.suppliers }}</div>
+                </div>
+                <div style="background:#fafafa;padding:12px;border:1px solid #eee;border-radius:6px">
+                    <div style="font-size:12px;color:#777">Items</div>
+                    <div style="font-size:22px;font-weight:bold">{{ analytics.counts.items }}</div>
+                    <div style="font-size:12px;color:#777">Stock Value: {{ '%.2f'|format(analytics.stock_value) }}</div>
+                </div>
+                <div style="background:#fafafa;padding:12px;border:1px solid #eee;border-radius:6px">
+                    <div style="font-size:12px;color:#777">Leads</div>
+                    <div style="font-size:22px;font-weight:bold">{{ analytics.counts.leads or 0 }}</div>
+                </div>
+                <div style="background:#fafafa;padding:12px;border:1px solid #eee;border-radius:6px">
+                    <div style="font-size:12px;color:#777">Opportunities</div>
+                    <div style="font-size:22px;font-weight:bold">{{ analytics.counts.opportunities or 0 }}</div>
+                </div>
+            </div>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+                <div style="background:#fafafa;padding:12px;border:1px solid #eee;border-radius:6px">
+                    <div style="font-size:12px;color:#777">Pipeline total</div>
+                    <div style="font-size:22px;font-weight:bold">{{ '%.2f'|format(analytics.pipeline_total or 0) }}</div>
+                    <div style="font-size:12px;color:#777">Win rate</div>
+                    <div style="font-size:16px">{{ '%.0f'|format((analytics.win_rate or 0) * 100) }}% 
+                        (Won total: {{ '%.2f'|format(analytics.won_total or 0) }})
+                    </div>
+                </div>
+                <div style="background:#fafafa;padding:12px;border:1px solid #eee;border-radius:6px">
+                    <div style="font-size:14px;font-weight:bold;margin-bottom:6px">Leads by status</div>
+                    <ul style="margin:0;padding-left:20px">
+                        {% for k,v in (analytics.lead_by_status or {}).items() %}
+                        <li>{{ k }}: {{ v }}</li>
+                        {% else %}
+                        <li>No data yet</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+                <div style="background:#fafafa;padding:12px;border:1px solid #eee;border-radius:6px">
+                    <div style="font-size:14px;font-weight:bold;margin-bottom:6px">Top leads (AI score)</div>
+                    <ul style="margin:0;padding-left:20px">
+                        {% for l in (analytics.top_leads or []) %}
+                        <li>{{ l.name }} — score {{ l.score }}</li>
+                        {% else %}
+                        <li>No leads yet</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                <div style="background:#fafafa;padding:12px;border:1px solid #eee;border-radius:6px">
+                    <div style="font-size:14px;font-weight:bold;margin-bottom:6px">Top opportunities (p(win))</div>
+                    <ul style="margin:0;padding-left:20px">
+                        {% for o in (analytics.top_opps or []) %}
+                        <li>{{ o.title }} — {{ '%.0f'|format(o.prob * 100) }}%</li>
+                        {% else %}
+                        <li>No opportunities yet</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+
+            <div style="background:#fafafa;padding:12px;border:1px solid #eee;border-radius:6px;margin-bottom:12px">
+                <div style="font-size:14px;font-weight:bold;margin-bottom:6px">AI suggestions (next best actions)</div>
+                <ul style="margin:0;padding-left:20px">
+                    {% for s in (analytics.suggestions or []) %}
+                    <li>{{ s }}</li>
+                    {% else %}
+                    <li>No suggestions yet</li>
+                    {% endfor %}
+                </ul>
+            </div>
+
+            <div style="background:#fff3cd;padding:12px;border:1px solid #ffeeba;border-radius:6px;margin-bottom:12px">
+                <div style="font-size:14px;font-weight:bold;margin-bottom:6px">Low stock alerts</div>
+                <ul style="margin:0;padding-left:20px">
+                    {% for it in low_stock %}
+                    <li>
+                        <a href="/items/{{ it['id'] }}/edit">{{ it['name'] }}</a>
+                        ({{ it['sku'] or '-' }}) — Qty {{ '%.2f'|format(it['stock_qty'] or 0) }} <= Reorder {{ '%.2f'|format(it['reorder_level'] or 0) }}
+                    </li>
+                    {% else %}
+                    <li>No low-stock items</li>
+                    {% endfor %}
+                </ul>
+            </div>
+
+            <h3>Quick navigation</h3>
+            <ul>
+               <li><a href="/customers">Customers</a> - Manage customer records</li>
+                <li><a href="/leads">Leads</a> - Track incoming leads</li>
+                <li><a href="/items">Inventory</a> - Manage items and stock</li>
+                <li><a href="/stock-moves">Stock Moves</a> - In/Out audit trail</li>
+                <li><a href="/purchase-orders">Purchase Orders</a> - List and manage POs</li>
+                <li><a href="/purchase-invoices">Purchase Invoices</a> - List and manage PIs</li>
+                <li><a href="/purchase-returns">Purchase Returns</a> - Record returns to suppliers</li>
+                <li><a href="/sales-orders">Sales Orders</a> - List and manage SOs</li>
+                <li><a href="/sales-invoices">Sales Invoices</a> - List and manage Invoices</li>
+                <li><a href="/reports/stock-balance">Stock Balance</a> - Inventory valuation</li>
+                <li><a href="/reports/outstanding">Outstanding</a> - Customer-wise dues from invoices</li>
+                <li><a href="/suppliers">Suppliers</a> - Manage vendors</li>
+                <li><a href="/settings">Settings</a> - App configuration</li>
+                <li><a href="/opportunities">Opportunities</a> - Manage sales pipeline</li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html>

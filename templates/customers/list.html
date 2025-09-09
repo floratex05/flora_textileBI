@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Customers</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f4f4f4; margin:0; }
+    .container { max-width: 960px; margin: 20px auto; background:#fff; padding:20px; border-radius:6px; box-shadow:0 1px 6px rgba(0,0,0,0.08); }
+    h1 { margin:0 0 12px; font-size: 20px; }
+
+    /* Minimal, readable button sizing */
+    a.button, button.button {
+      display: inline-block;
+      padding: 6px 12px;
+      font-size: 14px;
+      line-height: 1.3;
+      background: #333;
+      color: #fff;
+      text-decoration: none;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    a.button:hover, button.button:hover { background:#555; }
+
+    /* Actions bar: compact and wrapping to avoid overlap */
+    .actions {
+      margin-bottom: 10px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+    }
+
+    table { width:100%; border-collapse: collapse; }
+    th, td { padding: 8px; border-bottom:1px solid #eee; text-align:left; }
+    tr:hover { background:#fafafa; }
+
+    .row-actions form { display:inline; }
+    .row-actions button { background:#f44336; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer; font-size:12px; }
+
+    .topnav{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+    .nav a{margin-right:6px}
+  /* Dropdown styles */
+  .dropdown{position:relative;display:inline-block}
+  .dropdown > .button{background:#333;color:#fff}
+  .dropdown-menu{position:absolute;right:0;top:100%;background:#fff;border:1px solid #ddd;border-radius:6px;min-width:220px;box-shadow:0 4px 12px rgba(0,0,0,0.12);padding:6px 0;display:none;z-index:10}
+  .dropdown-menu a, .dropdown-menu button{display:block;width:100%;text-align:left;background:none;border:none;padding:8px 12px;color:#333;text-decoration:none;cursor:pointer}
+  .dropdown-menu a:hover, .dropdown-menu button:hover{background:#f5f5f5}
+  .dropdown-menu hr{border:none;border-top:1px solid #eee;margin:6px 0}
+  .pagination button{padding:6px 10px;border:1px solid #ddd;background:#fff;border-radius:4px;cursor:pointer}
+  .pagination button.active{background:#333;color:#fff;border-color:#333}
+  .pagination .muted{color:#666}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="topnav">
+      <h1>Customers</h1>
+      <div class="nav">
+        <a href="/" class="button" style="background:#4CAF50">Dashboard</a>
+        <a href="/leads" class="button">Leads</a>
+        <a href="/opportunities" class="button">Opportunities</a>
+        <a href="/logout" class="button" style="background:#f44336">Logout</a>
+      </div>
+    </div>
+
+    <div class="actions">
+      <a href="/customers/new" class="button" style="background:#2e7d32">+ New</a>
+      <div class="dropdown">
+        <button type="button" class="button" onclick="toggleDD('custExportDD')">Import / Export ▾</button>
+        <div id="custExportDD" class="dropdown-menu">
+          <div style="padding:6px 12px;color:#666;font-size:13px">Export</div>
+          <a href="/customers/export.csv">Export CSV</a>
+          <a href="/customers/export.xlsx">Export XLSX</a>
+          <hr/>
+          <div style="padding:6px 12px;color:#666;font-size:13px">Import Templates</div>
+          <a href="/customers/import-template.csv">CSV Template</a>
+          <a href="/customers/import-template.xlsx">XLSX Template</a>
+          <hr/>
+          <div style="padding:6px 12px;color:#666;font-size:13px">Import</div>
+          <form method="POST" action="/customers/import" enctype="multipart/form-data" style="padding:6px 12px">
+            <input type="file" name="file" accept=".csv,.xlsx,.xls" required style="display:block;margin-bottom:8px">
+            <button type="submit" class="button" style="background:#2196F3">Upload</button>
+          </form>
+        </div>
+      </div>
+
+      <!-- Search and filters (server-side) -->
+      <form method="GET" action="/customers" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <input name="q" value="{{ q or '' }}" type="text" placeholder="Search by Name or Email" style="padding:7px 10px;width:260px;border:1px solid #ddd;border-radius:4px" />
+        <select name="city" style="padding:7px 10px;border:1px solid #ddd;border-radius:4px;min-width:180px" onchange="this.form.submit()">
+          <option value="" {{ 'selected' if not city else '' }}>All Cities</option>
+          {% for c in cities or [] %}
+          <option value="{{ c }}" {{ 'selected' if city==c else '' }}>{{ c }}</option>
+          {% endfor %}
+        </select>
+        <select name="status" style="padding:7px 10px;border:1px solid #ddd;border-radius:4px;min-width:140px" onchange="this.form.submit()">
+          <option value="" {{ 'selected' if not status else '' }}>All Status</option>
+          <option value="active" {{ 'selected' if status=='active' else '' }}>Active</option>
+          <option value="inactive" {{ 'selected' if status=='inactive' else '' }}>Inactive</option>
+        </select>
+        <select name="per_page" style="padding:7px 10px;border:1px solid #ddd;border-radius:4px;min-width:120px" onchange="this.form.submit()">
+          {% for n in [20,50,100] %}
+          <option value="{{ n }}" {{ 'selected' if per_page==n else '' }}>{{ n }} / page</option>
+          {% endfor %}
+        </select>
+        <button type="submit" class="button" style="background:#2196F3">Search</button>
+        <a class="button" href="/customers" style="background:#6c757d">Clear</a>
+      </form>
+    </div>
+
+    {% with messages = get_flashed_messages() %}
+    {% if messages %}
+    <div>
+      {% for message in messages %}
+      <div style="padding:8px;background:#d4edda;color:#155724;border-radius:4px;margin-bottom:8px">{{ message }}</div>
+      {% endfor %}
+    </div>
+    {% endif %}
+    {% endwith %}
+
+    <table id="customersTable">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Email</th>
+          <th>Mobile</th>
+          <th>City</th>
+          <th>Status</th>
+          <th style="width:160px">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in customers %}
+        <tr data-name="{{ (c['name'] or '')|e }}" data-email="{{ (c['email'] or '')|e }}" data-city="{{ (c['city'] or '')|e }}" data-status="{{ (c['status'] or '')|e }}">
+          <td>{{ c['name'] }}</td>
+          <td>{{ c['email'] or '' }}</td>
+          <td>{{ c['mobile'] or '' }}</td>
+          <td>{{ c['city'] or '' }}</td>
+          <td>{{ c['status'] or '' }}</td>
+          <td class="row-actions">
+            <div class="dropdown">
+              <button type="button" class="button" onclick="toggleRowDD(this)">Actions ▾</button>
+              <div class="dropdown-menu">
+                <a href="/customers/{{ c['id'] }}/edit">Edit</a>
+                <a href="mailto:{{ c['email'] or '' }}">Send Email</a>
+                <a href="/leads?customer_id={{ c['id'] }}">View Leads</a>
+                <a href="/reports/customer-ledger/{{ c['id'] }}">Ledger</a>
+                <a href="/print/customer-ledger/{{ c['id'] }}">Print Ledger</a>
+                <a href="/pdf/customer-ledger/{{ c['id'] }}">PDF Ledger</a>
+                <hr/>
+                <form method="POST" action="/customers/{{ c['id'] }}/delete" onsubmit="return confirm('Delete this customer?')">
+                  <button type="submit" style="color:#c62828">Delete</button>
+                </form>
+              </div>
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6">No customers found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <div class="pagination" style="margin-top:12px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+      <a class="button" href="{{ url_for('customer_list', q=q, city=city, status=status, per_page=per_page, page=page-1) }}" {% if page<=1 %}style="pointer-events:none;opacity:.5"{% endif %}>Prev</a>
+      {% for p in range(1, (pages or 1)+1) %}
+        <a class="button {% if p==page %}active{% endif %}" href="{{ url_for('customer_list', q=q, city=city, status=status, per_page=per_page, page=p) }}">{{ p }}</a>
+      {% endfor %}
+      <a class="button" href="{{ url_for('customer_list', q=q, city=city, status=status, per_page=per_page, page=page+1) }}" {% if page>=pages %}style="pointer-events:none;opacity:.5"{% endif %}>Next</a>
+      <span class="muted">Page {{ page }} of {{ pages }} • {{ total }} customers</span>
+    </div>
+  </div>
+
+  <script>
+    function toggleDD(id){
+      const dd = document.getElementById(id);
+      const isOpen = dd.style.display === 'block';
+      document.querySelectorAll('.dropdown-menu').forEach(m => m.style.display='none');
+      dd.style.display = isOpen ? 'none' : 'block';
+    }
+    function toggleRowDD(btn){
+      const menu = btn.parentElement.querySelector('.dropdown-menu');
+      const open = menu.style.display === 'block';
+      document.querySelectorAll('#customersTable .dropdown .dropdown-menu').forEach(m => m.style.display='none');
+      menu.style.display = open ? 'none' : 'block';
+    }
+    document.addEventListener('click', (e) => {
+      const inside = e.target.closest('.dropdown');
+      if (!inside) document.querySelectorAll('.dropdown-menu').forEach(m => m.style.display='none');
+    });
+
+    function normalize(s){ return (s || '').toString().toLowerCase(); }
+
+    function filterRows(){
+      const q = normalize(document.getElementById('q').value);
+      const city = normalize(document.getElementById('cityFilter').value);
+      const status = normalize(document.getElementById('statusFilter').value);
+      document.querySelectorAll('#customersTable tbody tr').forEach(tr => {
+        const name = normalize(tr.getAttribute('data-name'));
+        const email = normalize(tr.getAttribute('data-email'));
+        const c = normalize(tr.getAttribute('data-city'));
+        const st = normalize(tr.getAttribute('data-status'));
+        let ok = true;
+        if (q) ok = name.includes(q) || email.includes(q);
+        if (ok && city) ok = (c === city);
+        if (ok && status) ok = (st === status);
+        tr.style.display = ok ? '' : 'none';
+      });
+    }
+
+    function clearFilters(){
+      document.getElementById('q').value = '';
+      document.getElementById('cityFilter').value = '';
+      document.getElementById('statusFilter').value = '';
+      refilterAndPaginate();
+    }
+
+    function populateFilters(){
+      const cities = new Set();
+      document.querySelectorAll('#customersTable tbody tr').forEach(tr => {
+        const c = tr.getAttribute('data-city');
+        if (c) cities.add(c);
+      });
+      const cf = document.getElementById('cityFilter');
+      [...Array.from(cities).sort()].forEach(v => { const opt = document.createElement('option'); opt.value = v; opt.textContent = v; cf.appendChild(opt); });
+    }
+
+    // Pagination
+    const PAGE_SIZE = 20;
+    function paginate(){
+      const rows = Array.from(document.querySelectorAll('#customersTable tbody tr'));
+      const visible = rows.filter(r => r.style.display !== 'none');
+      const pages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE));
+      const pagination = document.getElementById('pagination');
+      let current = parseInt(sessionStorage.getItem('customers_current_page') || '1', 10);
+      if (current > pages) current = 1;
+
+      function renderPage(page){
+        current = page;
+        sessionStorage.setItem('customers_current_page', String(current));
+        const start = (current - 1) * PAGE_SIZE;
+        const end = start + PAGE_SIZE;
+        let idx = 0;
+        visible.forEach(r => {
+          const show = idx >= start && idx < end;
+          r.style.visibility = show ? '' : 'hidden';
+          r.style.position = show ? '' : 'absolute';
+          r.style.pointerEvents = show ? '' : 'none';
+          r.style.height = show ? '' : '0';
+          r.style.overflow = show ? '' : 'hidden';
+          idx++;
+        });
+        pagination.innerHTML = '';
+        const info = document.createElement('span');
+        info.className = 'muted';
+        info.textContent = `Showing ${Math.min(end, visible.length)} of ${visible.length}`;
+        const prev = document.createElement('button'); prev.textContent = 'Prev'; prev.disabled = current<=1; prev.onclick = ()=>renderPage(current-1);
+        const next = document.createElement('button'); next.textContent = 'Next'; next.disabled = current>=pages; next.onclick = ()=>renderPage(current+1);
+        pagination.appendChild(prev);
+        for (let p=1;p<=pages;p++){
+          const b = document.createElement('button'); b.textContent = p; if (p===current) b.classList.add('active'); b.onclick = ()=>renderPage(p); pagination.appendChild(b);
+        }
+        pagination.appendChild(next);
+        pagination.appendChild(info);
+      }
+      renderPage(current);
+    }
+
+    function refilterAndPaginate(){
+      filterRows();
+      paginate();
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      populateFilters();
+      refilterAndPaginate();
+      ['q','cityFilter','statusFilter'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('change', paginate);
+      });
+    });
+  </script>
+</body>
+</html>

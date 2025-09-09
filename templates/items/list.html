@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Inventory</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f4f4f4; margin:0; }
+    .container { max-width: 1200px; margin: 20px auto; background:#fff; padding:20px; border-radius:6px; box-shadow:0 1px 6px rgba(0,0,0,0.08); }
+    h1 { margin:0 0 16px; }
+    .actions { margin-bottom: 12px; }
+    a.button, .button { display:inline-block; padding:8px 12px; background:#333; color:#fff; text-decoration:none; border:none; border-radius:4px; cursor:pointer; }
+    table { width:100%; border-collapse: collapse; }
+    th, td { padding: 8px; border-bottom:1px solid #eee; text-align:left; }
+    tr:hover { background:#fafafa; }
+    .pagination button{padding:6px 10px;border:1px solid #ddd;background:#fff;border-radius:4px;cursor:pointer}
+    .pagination button.active{background:#333;color:#fff;border-color:#333}
+    .pagination .muted{color:#666}
+    .row-actions form { display:inline; }
+    .row-actions button { background:#f44336; color:white; border:none; padding:6px 10px; border-radius:4px; cursor:pointer; }
+    .topnav{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+    .nav a{margin-right:8px}
+    .low-stock{color:#d35400;font-weight:bold}
+    .img-thumb{width:40px;height:40px;object-fit:cover;border:1px solid #eee;border-radius:4px}
+  /* Dropdown styles */
+  .dropdown{position:relative;display:inline-block}
+  .dropdown > .button{background:#333;color:#fff}
+  .dropdown-menu{position:absolute;right:0;top:100%;background:#fff;border:1px solid #ddd;border-radius:6px;min-width:220px;box-shadow:0 4px 12px rgba(0,0,0,0.12);padding:6px 0;display:none;z-index:10}
+  .dropdown-menu a, .dropdown-menu button{display:block;width:100%;text-align:left;background:none;border:none;padding:8px 12px;color:#333;text-decoration:none;cursor:pointer}
+  .dropdown-menu a:hover, .dropdown-menu button:hover{background:#f5f5f5}
+  .dropdown-menu hr{border:none;border-top:1px solid #eee;margin:6px 0}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="topnav">
+      <h1>Inventory</h1>
+      <div class="nav">
+        <a href="/" class="button" style="background:#4CAF50">Dashboard</a>
+        <a href="/customers" class="button">Customers</a>
+        <a href="/leads" class="button">Leads</a>
+        <a href="/opportunities" class="button">Opportunities</a>
+        <a href="/logout" class="button" style="background:#f44336">Logout</a>
+      </div>
+    </div>
+
+    <div class="actions">
+      <a href="/items/new" class="button" style="background:#4CAF50">+ New Item</a>
+      <a href="/items/barcodes" class="button" style="background:#9C27B0">Barcodes</a>
+
+      <div class="dropdown" style="margin-left:8px">
+        <button type="button" class="button" onclick="toggleDD('exportDD')">Import / Export ▾</button>
+        <div id="exportDD" class="dropdown-menu">
+          <div style="padding:6px 12px;color:#666;font-size:13px">Export</div>
+          <a href="/items/export.csv">Export CSV</a>
+          <a href="/items/export.xlsx">Export XLSX</a>
+          <hr/>
+          <div style="padding:6px 12px;color:#666;font-size:13px">Import Templates</div>
+          <a href="/items/import-template.csv">CSV Template</a>
+          <a href="/items/import-template.xlsx">XLSX Template</a>
+          <hr/>
+          <div style="padding:6px 12px;color:#666;font-size:13px">Import</div>
+          <form id="importForm" method="POST" action="/items/import" enctype="multipart/form-data" style="padding:6px 12px">
+            <input type="file" name="file" accept=".csv,.xlsx,.xls" required style="display:block;margin-bottom:8px">
+            <button type="submit" class="button" style="background:#2196F3">Upload</button>
+          </form>
+        </div>
+      </div>
+
+      <div style="margin-top:6px;color:#666;font-size:13px">
+        Use the template headers: sku, name, description, uom, cost_price, selling_price, stock_qty, reorder_level, hsn_code, gst_rate, discount, supplier_id or supplier_name, brand, image_path, status
+      </div>
+
+      <form id="filtersForm" method="GET" action="/items" class="actions" style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <input name="q" value="{{ q or '' }}" type="text" placeholder="Search by SKU or Name" style="padding:7px 10px;width:260px;border:1px solid #ddd;border-radius:4px" />
+        <select name="brand" style="padding:7px 10px;border:1px solid #ddd;border-radius:4px;min-width:160px" onchange="this.form.submit()">
+          <option value="" {{ 'selected' if not brand else '' }}>All Brands</option>
+          {% for b in brands or [] %}
+          <option value="{{ b }}" {{ 'selected' if brand==b else '' }}>{{ b }}</option>
+          {% endfor %}
+        </select>
+        <select name="supplier" style="padding:7px 10px;border:1px solid #ddd;border-radius:4px;min-width:180px" onchange="this.form.submit()">
+          <option value="" {{ 'selected' if not supplier else '' }}>All Suppliers</option>
+          {% for s in suppliers or [] %}
+          <option value="{{ s }}" {{ 'selected' if supplier==s else '' }}>{{ s }}</option>
+          {% endfor %}
+        </select>
+        <select name="status" style="padding:7px 10px;border:1px solid #ddd;border-radius:4px;min-width:140px" onchange="this.form.submit()">
+          <option value="" {{ 'selected' if not status else '' }}>All Status</option>
+          <option value="active" {{ 'selected' if status=='active' else '' }}>Active</option>
+          <option value="inactive" {{ 'selected' if status=='inactive' else '' }}>Inactive</option>
+        </select>
+        <select name="per_page" style="padding:7px 10px;border:1px solid #ddd;border-radius:4px;min-width:120px" onchange="this.form.submit()">
+          {% for n in [20,50,100] %}
+          <option value="{{ n }}" {{ 'selected' if per_page==n else '' }}>{{ n }} / page</option>
+          {% endfor %}
+        </select>
+        <button type="submit" class="button" style="background:#2196F3">Search</button>
+        <a class="button" href="/items" style="background:#607D8B">Clear</a>
+      </form>
+    </div>
+
+    {% with messages = get_flashed_messages() %}
+    {% if messages %}
+    <div>
+      {% for message in messages %}
+      <div style="padding:8px;background:#d4edda;color:#155724;border-radius:4px;margin-bottom:8px">{{ message }}</div>
+      {% endfor %}
+    </div>
+    {% endif %}
+    {% endwith %}
+
+    <table id="itemsTable">
+      <thead>
+        <tr>
+          <th>Image</th>
+          <th>SKU</th>
+          <th>Name</th>
+          <th>Brand</th>
+          <th>UoM</th>
+          <th>Cost Price</th>
+          <th>Selling Price</th>
+          <th>GST %</th>
+          <th>Stock Qty</th>
+          <th>Reorder Level</th>
+          <th>Supplier</th>
+          <th>Status</th>
+          <th style="width:200px">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for i in items %}
+        <tr data-sku="{{ (i['sku'] or '')|e }}" data-name="{{ (i['name'] or '')|e }}" data-brand="{{ (i['brand'] or '')|e }}" data-supplier="{{ (i['supplier_name'] or '')|e }}" data-status="{{ (i['status'] or '')|e }}">
+          <td>
+            {% if i['image_path'] %}
+            <img class="img-thumb" src="/{{ i['image_path'] }}" alt="img"/>
+            {% else %}-{% endif %}
+          </td>
+          <td>{{ i['sku'] or '' }}</td>
+          <td>{{ i['name'] }}</td>
+          <td>{{ i['brand'] or '' }}</td>
+          <td>{{ i['uom'] or 'Nos' }}</td>
+          <td>{{ '%.2f'|format(i['cost_price'] or 0) }}</td>
+          <td>{{ '%.2f'|format(i['selling_price'] or 0) }}</td>
+          <td>{{ '%.2f'|format(i['gst_rate'] or 0) }}</td>
+          <td class="{{ 'low-stock' if (i['stock_qty'] or 0) <= (i['reorder_level'] or 0) else '' }}">{{ '%.2f'|format(i['stock_qty'] or 0) }}</td>
+          <td>{{ '%.2f'|format(i['reorder_level'] or 0) }}</td>
+          <td>{{ i['supplier_name'] or '' }}</td>
+          <td>{{ i['status'] or '' }}</td>
+          <td class="row-actions">
+            <div class="dropdown">
+              <button type="button" class="button" onclick="toggleRowDD(this)">Actions ▾</button>
+              <div class="dropdown-menu">
+                <a href="/items/{{ i['id'] }}/edit">Edit</a>
+                <a href="/stock-moves/new?item_id={{ i['id'] }}">Stock Move</a>
+                <a href="/items/barcodes?q={{ (i['sku'] or i['name'])|urlencode }}">Print Barcode</a>
+                <hr/>
+                <form method="POST" action="/items/{{ i['id'] }}/delete" onsubmit="return confirm('Delete this item?')">
+                  <button type="submit" style="color:#c62828">Delete</button>
+                </form>
+              </div>
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="13">No items found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <div class="pagination" style="margin-top:12px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+      <a class="button" href="{{ url_for('items_list', q=q, brand=brand, supplier=supplier, status=status, per_page=per_page, page=page-1) }}" {% if page<=1 %}style="pointer-events:none;opacity:.5"{% endif %}>Prev</a>
+      {% for p in range(1, (pages or 1)+1) %}
+        <a class="button {% if p==page %}active{% endif %}" href="{{ url_for('items_list', q=q, brand=brand, supplier=supplier, status=status, per_page=per_page, page=p) }}">{{ p }}</a>
+      {% endfor %}
+      <a class="button" href="{{ url_for('items_list', q=q, brand=brand, supplier=supplier, status=status, per_page=per_page, page=page+1) }}" {% if page>=pages %}style="pointer-events:none;opacity:.5"{% endif %}>Next</a>
+      <span class="muted">Page {{ page }} of {{ pages }} • {{ total }} items</span>
+    </div>
+  </div>
+
+  <script>
+    function toggleDD(id){
+      const dd = document.getElementById(id);
+      const isOpen = dd.style.display === 'block';
+      document.querySelectorAll('.dropdown-menu').forEach(m => m.style.display='none');
+      dd.style.display = isOpen ? 'none' : 'block';
+    }
+    function toggleRowDD(btn){
+      const menu = btn.parentElement.querySelector('.dropdown-menu');
+      const open = menu.style.display === 'block';
+      document.querySelectorAll('#itemsTable .dropdown .dropdown-menu').forEach(m => m.style.display='none');
+      menu.style.display = open ? 'none' : 'block';
+    }
+    document.addEventListener('click', (e) => {
+      const inside = e.target.closest('.dropdown');
+      if (!inside) document.querySelectorAll('.dropdown-menu').forEach(m => m.style.display='none');
+    });
+  </script>
+</body>
+</html>

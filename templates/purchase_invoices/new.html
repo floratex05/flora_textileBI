@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>New Purchase Invoice</title>
+  <style>
+    body { 
+      font-family: Arial, sans-serif; 
+      background: #f4f4f4; 
+      margin: 0; 
+    }
+    .container { 
+      max-width: 1200px; 
+      margin: 20px auto; 
+      background: #fff; 
+      padding: 20px; 
+      border-radius: 6px; 
+      box-shadow: 0 1px 6px rgba(0,0,0,0.08); 
+    }
+    h1 { 
+      margin: 0 0 16px; 
+    }
+    a.button, button { 
+      display: inline-block; 
+      padding: 8px 12px; 
+      background: #333; 
+      color: #fff; 
+      text-decoration: none; 
+      border: none; 
+      border-radius: 4px; 
+      cursor: pointer; 
+    }
+    a.button:hover, button:hover {
+      background: #555;
+    }
+    .row { 
+      margin-bottom: 10px; 
+      display: flex; 
+      gap: 10px; 
+      align-items: center;
+    }
+    .row label { 
+      width: 180px; 
+      text-align: right; 
+      color: #555; 
+    }
+    .row input, .row select, .row textarea { 
+      flex: 1; 
+      padding: 8px; 
+      border: 1px solid #ddd; 
+      border-radius: 4px; 
+    }
+    
+    /* Table Styles */
+    .table-container {
+      overflow-x: auto;
+      margin-top: 10px;
+    }
+    table { 
+      width: 100%; 
+      border-collapse: collapse; 
+      min-width: 800px;
+    }
+    th, td { 
+      padding: 8px 12px; 
+      border: 1px solid #ddd; 
+      text-align: left; 
+      vertical-align: middle;
+    }
+    th {
+      background: #f8f9fa;
+      font-weight: bold;
+      color: #333;
+    }
+    
+    /* Column widths */
+    .col-item { width: 30%; }
+    .col-qty { width: 8%; }
+    .col-rate { width: 10%; }
+    .col-discount { width: 8%; }
+    .col-gst { width: 8%; }
+    .col-total { width: 12%; text-align: right; }
+    .col-action { width: 5%; text-align: center; }
+    
+    /* Input styles in table */
+    td input, td select {
+      width: 100%;
+      padding: 6px 8px;
+      border: 1px solid #ddd;
+      border-radius: 3px;
+      font-size: 14px;
+      box-sizing: border-box;
+    }
+    
+    td input[type="number"] {
+      text-align: right;
+    }
+    
+    .line-total {
+      font-weight: bold;
+      color: #333;
+    }
+    
+    .remove-btn {
+      background: #dc3545;
+      color: white;
+      border: none;
+      border-radius: 3px;
+      padding: 4px 8px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    .remove-btn:hover {
+      background: #c82333;
+    }
+    
+    /* Searchable select styles */
+    .searchable-select {
+      position: relative;
+    }
+    .searchable-select input {
+      width: 100%;
+      padding: 6px 8px;
+      border: 1px solid #ddd;
+      border-radius: 3px;
+    }
+    .searchable-select .dropdown {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      background: white;
+      border: 1px solid #ddd;
+      border-top: none;
+      max-height: 240px;
+      overflow-y: auto;
+      z-index: 10000; /* ensure above table and container */
+      display: none;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.1);
+    }
+    .searchable-select .dropdown.show {
+      display: block;
+    }
+    .searchable-select .dropdown-item {
+      padding: 8px 12px;
+      cursor: pointer;
+      border-bottom: 1px solid #eee;
+    }
+    .searchable-select .dropdown-item:hover {
+      background: #f8f9fa;
+    }
+    .searchable-select .dropdown-item:last-child {
+      border-bottom: none;
+    }
+    
+    /* File input styling */
+    .file-input-wrapper {
+      position: relative;
+      display: inline-block;
+      flex: 1;
+    }
+    .file-input-wrapper input[type="file"] {
+      opacity: 0;
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      cursor: pointer;
+    }
+    .file-input-display {
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      background: #f8f9fa;
+      cursor: pointer;
+      display: block;
+    }
+    .file-input-display:hover {
+      background: #e9ecef;
+    }
+    
+    /* Totals section */
+    .totals-section {
+      margin-top: 20px;
+      display: flex;
+      justify-content: flex-end;
+    }
+    .totals-box {
+      background: #f8f9fa;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      padding: 15px;
+      min-width: 300px;
+    }
+    .total-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+    .total-row:last-child {
+      margin-bottom: 0;
+      font-size: 16px;
+      font-weight: bold;
+      border-top: 1px solid #ddd;
+      padding-top: 8px;
+      margin-top: 8px;
+    }
+    .total-label {
+      color: #555;
+    }
+    .total-amount {
+      font-weight: bold;
+      color: #333;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <h1>New Purchase Invoice</h1>
+      <div style="display:flex;gap:10px;">
+        <a href="javascript:history.back()" class="button" style="background:#6c757d;">← Back</a>
+        <a href="/dashboard" class="button" style="background:#007bff;">🏠 Dashboard</a>
+        <a href="/stock-moves" class="button">Stock Moves</a>
+      </div>
+    </div>
+
+    <form method="POST" enctype="multipart/form-data">
+      <div class="row">
+        <label>Supplier</label>
+        <select name="supplier_id" required id="supplierSelect">
+          <option value="">Select Supplier</option>
+          <option value="1">Supplier A</option>
+          <option value="2">Supplier B</option>
+          <option value="3">Supplier C</option>
+        </select>
+      </div>
+      <div class="row">
+        <label>Supplier Invoice No</label>
+        <input type="text" name="supplier_invoice_no" placeholder="Enter supplier's invoice number"/>
+      </div>
+      <div class="row">
+        <label>Supplier Invoice Date</label>
+        <input type="date" name="supplier_invoice_date" value="2025-08-14"/>
+      </div>
+      <div class="row">
+        <label>GST Type</label>
+        <select name="gst_type" id="gstType" onchange="updateGSTColumns()">
+          <option value="intrastate">Intrastate (CGST + SGST)</option>
+          <option value="interstate">Interstate (IGST)</option>
+        </select>
+      </div>
+      <div class="row">
+        <label>Notes</label>
+        <textarea name="notes" placeholder="Reference PO / delivery info..."></textarea>
+      </div>
+      <div class="row">
+        <label>Upload Invoice Document</label>
+        <div class="file-input-wrapper">
+          <input type="file" name="invoice_doc" accept="application/pdf,image/*" onchange="updateFileName(this)"/>
+          <span class="file-input-display" id="fileDisplay">Choose file (PDF or Image)...</span>
+        </div>
+      </div>
+
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th class="col-item">Item</th>
+              <th class="col-qty">Qty</th>
+              <th class="col-rate">Rate (₹)</th>
+              <th class="col-discount">Discount (₹)</th>
+              <th class="col-gst" id="gstHeader1">CGST %</th>
+              <th class="col-gst" id="gstHeader2">SGST %</th>
+              <th class="col-total">Line Total (₹)</th>
+              <th class="col-action"></th>
+            </tr>
+          </thead>
+          <tbody id="lines"></tbody>
+        </table>
+      </div>
+      
+      <div style="margin-top: 12px;">
+        <button type="button" onclick="addRow()">+ Add Line Item</button>
+      </div>
+
+      <div class="totals-section">
+        <div class="totals-box">
+          <div class="total-row">
+            <span class="total-label">Sub Total:</span>
+            <span class="total-amount">₹<span id="total">0.00</span></span>
+          </div>
+          <div class="total-row" id="cgstRow">
+            <span class="total-label">CGST:</span>
+            <span class="total-amount">₹<span id="cgst_total">0.00</span></span>
+          </div>
+          <div class="total-row" id="sgstRow">
+            <span class="total-label">SGST:</span>
+            <span class="total-amount">₹<span id="sgst_total">0.00</span></span>
+          </div>
+          <div class="total-row" id="igstRow" style="display:none;">
+            <span class="total-label">IGST:</span>
+            <span class="total-amount">₹<span id="igst_total">0.00</span></span>
+          </div>
+          <div class="total-row">
+            <span class="total-label">Grand Total:</span>
+            <span class="total-amount">₹<span id="grand_total">0.00</span></span>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top: 20px;">
+        <button type="submit" style="background: #28a745; padding: 12px 24px; font-size: 16px;">Submit Purchase Invoice</button>
+      </div>
+    </form>
+  </div>
+
+  <script>
+    // Global variables
+    window.items = [];
+    window.suppliers = [];
+    window.defaultGST = 9.00; // Default CGST/SGST rate (9% each = 18% total)
+
+    // Load initial data
+    async function loadInitialData() {
+      try {
+        // Load suppliers
+        const suppliersResponse = await fetch('/api/suppliers');
+        if (suppliersResponse.ok) {
+          window.suppliers = await suppliersResponse.json();
+          populateSupplierDropdown();
+        }
+        
+        // Load recent items for initial display
+        const itemsResponse = await fetch('/api/items/search?limit=50');
+        if (itemsResponse.ok) {
+          window.items = await itemsResponse.json();
+        }
+      } catch (error) {
+        console.error('Error loading initial data:', error);
+      }
+    }
+
+    function populateSupplierDropdown() {
+      const supplierSelect = document.getElementById('supplierSelect');
+      supplierSelect.innerHTML = '<option value="">Select Supplier</option>';
+      
+      window.suppliers.forEach(supplier => {
+        const option = document.createElement('option');
+        option.value = supplier.id;
+        option.textContent = supplier.name;
+        supplierSelect.appendChild(option);
+      });
+    }
+
+    function updateGSTColumns() {
+      const gstType = document.getElementById('gstType').value;
+      const header1 = document.getElementById('gstHeader1');
+      const header2 = document.getElementById('gstHeader2');
+      const cgstRow = document.getElementById('cgstRow');
+      const sgstRow = document.getElementById('sgstRow');
+      const igstRow = document.getElementById('igstRow');
+      
+      if (gstType === 'interstate') {
+        header1.textContent = 'IGST %';
+        header2.style.display = 'none';
+        cgstRow.style.display = 'none';
+        sgstRow.style.display = 'none';
+        igstRow.style.display = 'flex';
+        
+        // Update existing rows to hide second GST column
+        document.querySelectorAll('#lines tr').forEach(tr => {
+          const cells = tr.children;
+          if (cells.length > 5) {
+            cells[5].style.display = 'none'; // Hide second GST input
+          }
+        });
+      } else {
+        header1.textContent = 'CGST %';
+        header2.textContent = 'SGST %';
+        header2.style.display = 'table-cell';
+        cgstRow.style.display = 'flex';
+        sgstRow.style.display = 'flex';
+        igstRow.style.display = 'none';
+        
+        // Show second GST column for existing rows
+        document.querySelectorAll('#lines tr').forEach(tr => {
+          const cells = tr.children;
+          if (cells.length > 5) {
+            cells[5].style.display = 'table-cell';
+          }
+        });
+      }
+      calcTotals();
+    }
+
+    function updateFileName(input) {
+      const display = document.getElementById('fileDisplay');
+      if (input.files.length > 0) {
+        display.textContent = input.files[0].name;
+        display.style.color = '#333';
+      } else {
+        display.textContent = 'Choose file (PDF or Image)...';
+        display.style.color = '#666';
+      }
+    }
+
+    async function searchItems(query) {
+      try {
+        const url = query && query.trim() ? `/api/items/search?q=${encodeURIComponent(query)}&limit=20` : `/api/items/search?limit=20`;
+        const response = await fetch(url);
+        if (response.ok) {
+          const data = await response.json();
+          return Array.isArray(data) ? data : [];
+        }
+      } catch (error) {
+        console.error('Error searching items:', error);
+      }
+      return [];
+    }
+
+    function createSearchableSelect(selectedItemId = '', rowElement = null) {
+      const div = document.createElement('div');
+      div.className = 'searchable-select';
+      
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.placeholder = 'Search items...';
+      input.autocomplete = 'off';
+      
+      const dropdown = document.createElement('div');
+      dropdown.className = 'dropdown';
+      
+      const hiddenInput = document.createElement('input');
+      hiddenInput.type = 'hidden';
+      hiddenInput.name = 'item_id[]';
+      
+      div.appendChild(input);
+      div.appendChild(dropdown);
+      div.appendChild(hiddenInput);
+      
+      let searchTimeout;
+      
+      async function updateDropdown(searchTerm = '') {
+        let items;
+        if (searchTerm.trim()) {
+          items = await searchItems(searchTerm);
+        } else {
+          items = window.items.slice(0, 20); // Show recent items
+        }
+        
+        dropdown.innerHTML = '';
+        items.forEach(item => {
+          const itemDiv = document.createElement('div');
+          itemDiv.className = 'dropdown-item';
+          itemDiv.textContent = `${item.name}${item.sku ? ' (' + item.sku + ')' : ''}`;
+          itemDiv.addEventListener('click', () => {
+            selectItem(item);
+          });
+          dropdown.appendChild(itemDiv);
+        });
+      }
+      
+      function selectItem(item) {
+        input.value = `${item.name}${item.sku ? ' (' + item.sku + ')' : ''}`;
+        hiddenInput.value = item.id;
+        dropdown.classList.remove('show');
+        
+        // Auto-populate fields if this is part of a table row
+        if (rowElement) {
+          autoPopulateRow(rowElement, item);
+        }
+        
+        calcTotals();
+      }
+      
+      input.addEventListener('focus', () => {
+        updateDropdown(input.value || '');
+        dropdown.classList.add('show');
+      });
+      
+      input.addEventListener('input', (e) => {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => {
+          updateDropdown(e.target.value);
+          dropdown.classList.add('show');
+        }, 300); // Debounce search
+        hiddenInput.value = '';
+      });
+      
+      document.addEventListener('click', (e) => {
+        if (!div.contains(e.target)) {
+          dropdown.classList.remove('show');
+        }
+      });
+      
+      // Set initial value if provided
+      if (selectedItemId) {
+        const item = window.items.find(i => i.id == selectedItemId);
+        if (item) {
+          input.value = `${item.name}${item.sku ? ' (' + item.sku + ')' : ''}`;
+          hiddenInput.value = item.id;
+        }
+      }
+      
+      return div;
+    }
+
+    function autoPopulateRow(rowElement, item) {
+      // Auto-populate rate with cost_price (you can change this to selling_price if preferred)
+      const rateInput = rowElement.querySelector('[name="rate[]"]');
+      if (rateInput && (!rateInput.value || rateInput.value == '0')) {
+        rateInput.value = item.cost_price || 0;
+      }
+      
+      // Auto-populate discount
+      const discountInput = rowElement.querySelector('[name="discount[]"]');
+      if (discountInput && (!discountInput.value || discountInput.value == '0')) {
+        discountInput.value = item.discount || 0;
+      }
+      
+      // Auto-populate GST rates
+      const gstType = document.getElementById('gstType').value;
+      const gstRate = item.gst_rate || window.defaultGST;
+      
+      if (gstType === 'interstate') {
+        // For interstate, use full GST rate in IGST field
+        const igstInput = rowElement.querySelector('[name="cgst_rate[]"]');
+        if (igstInput && (!igstInput.value || igstInput.value == window.defaultGST.toString())) {
+          igstInput.value = gstRate;
+        }
+      } else {
+        // For intrastate, split GST rate between CGST and SGST
+        const cgstInput = rowElement.querySelector('[name="cgst_rate[]"]');
+        const sgstInput = rowElement.querySelector('[name="sgst_rate[]"]');
+        
+        if (cgstInput && (!cgstInput.value || cgstInput.value == window.defaultGST.toString())) {
+          cgstInput.value = gstRate / 2;
+        }
+        if (sgstInput && (!sgstInput.value || sgstInput.value == window.defaultGST.toString())) {
+          sgstInput.value = gstRate / 2;
+        }
+      }
+      
+      // Show stock quantity info (optional - you can remove this if not needed)
+      if (item.stock_qty !== undefined) {
+        const qtyInput = rowElement.querySelector('[name="qty[]"]');
+        if (qtyInput) {
+          qtyInput.title = `Available stock: ${item.stock_qty} ${item.uom || 'Nos'}`;
+        }
+      }
+    }
+
+    function addRow(pref = {}) {
+      const tbody = document.getElementById('lines');
+      const tr = document.createElement('tr');
+
+      // Item cell with custom searchable select
+      const itemCell = document.createElement('td');
+      const searchableSelect = createSearchableSelect(pref.item_id, tr);
+      itemCell.appendChild(searchableSelect);
+      tr.appendChild(itemCell);
+
+      // Qty cell
+      const qtyCell = document.createElement('td');
+      const qtyInput = document.createElement('input');
+      qtyInput.type = 'number';
+      qtyInput.step = '0.01';
+      qtyInput.name = 'qty[]';
+      qtyInput.value = (pref.qty ?? 1);
+      qtyInput.required = true;
+      qtyInput.min = '0.01';
+      qtyCell.appendChild(qtyInput);
+      tr.appendChild(qtyCell);
+
+      // Rate cell
+      const rateCell = document.createElement('td');
+      const rateInput = document.createElement('input');
+      rateInput.type = 'number';
+      rateInput.step = '0.01';
+      rateInput.name = 'rate[]';
+      rateInput.value = (pref.rate ?? 0);
+      rateInput.required = true;
+      rateInput.min = '0';
+      rateCell.appendChild(rateInput);
+      tr.appendChild(rateCell);
+
+      // Discount cell
+      const discCell = document.createElement('td');
+      const discInput = document.createElement('input');
+      discInput.type = 'number';
+      discInput.step = '0.01';
+      discInput.name = 'discount[]';
+      discInput.value = (pref.discount ?? 0);
+      discInput.min = '0';
+      discCell.appendChild(discInput);
+      tr.appendChild(discCell);
+
+      // GST cells
+      const cgstCell = document.createElement('td');
+      const cgstInput = document.createElement('input');
+      cgstInput.type = 'number';
+      cgstInput.step = '0.01';
+      cgstInput.name = 'cgst_rate[]';
+      cgstInput.value = (pref.cgst_rate ?? window.defaultGST);
+      cgstInput.min = '0';
+      cgstInput.max = '100';
+      cgstCell.appendChild(cgstInput);
+      tr.appendChild(cgstCell);
+
+      const sgstCell = document.createElement('td');
+      const sgstInput = document.createElement('input');
+      sgstInput.type = 'number';
+      sgstInput.step = '0.01';
+      sgstInput.name = 'sgst_rate[]';
+      sgstInput.value = (pref.sgst_rate ?? window.defaultGST);
+      sgstInput.min = '0';
+      sgstInput.max = '100';
+      sgstCell.appendChild(sgstInput);
+      tr.appendChild(sgstCell);
+
+      // Line total cell
+      const totalCell = document.createElement('td');
+      totalCell.className = 'line-total';
+      totalCell.textContent = '₹0.00';
+      tr.appendChild(totalCell);
+
+      // Action cell
+      const actionCell = document.createElement('td');
+      const removeBtn = document.createElement('button');
+      removeBtn.type = 'button';
+      removeBtn.className = 'remove-btn';
+      removeBtn.textContent = '✕';
+      removeBtn.onclick = function() { removeRow(removeBtn); };
+      actionCell.appendChild(removeBtn);
+      tr.appendChild(actionCell);
+
+      tbody.appendChild(tr);
+
+      // Apply GST column visibility based on current GST type
+      updateGSTColumns();
+      calcTotals();
+    }
+    
+    function removeRow(button) {
+      button.closest('tr').remove();
+      calcTotals();
+    }
+
+    function calcTotals() {
+      let total = 0, cgstTotal = 0, sgstTotal = 0, igstTotal = 0;
+      const gstType = document.getElementById('gstType').value;
+      
+      document.querySelectorAll('#lines tr').forEach(tr => {
+        const qty = parseFloat(tr.querySelector('[name="qty[]"]').value || 0);
+        const rate = parseFloat(tr.querySelector('[name="rate[]"]').value || 0);
+        const disc = parseFloat(tr.querySelector('[name="discount[]"]').value || 0);
+        
+        const sub = Math.max(qty * rate - disc, 0);
+        let lineTotal = sub;
+        
+        if (gstType === 'interstate') {
+          const igst = parseFloat(tr.querySelector('[name="cgst_rate[]"]').value || 0);
+          const igstAmt = sub * (igst / 100);
+          lineTotal = sub + igstAmt;
+          igstTotal += igstAmt;
+        } else {
+          const cgst = parseFloat(tr.querySelector('[name="cgst_rate[]"]').value || 0);
+          const sgst = parseFloat(tr.querySelector('[name="sgst_rate[]"]').value || 0);
+          const cgstAmt = sub * (cgst / 100);
+          const sgstAmt = sub * (sgst / 100);
+          lineTotal = sub + cgstAmt + sgstAmt;
+          cgstTotal += cgstAmt;
+          sgstTotal += sgstAmt;
+        }
+        
+        tr.querySelector('.line-total').textContent = `₹${lineTotal.toFixed(2)}`;
+        total += sub;
+      });
+      
+      document.getElementById('total').textContent = total.toFixed(2);
+      document.getElementById('cgst_total').textContent = cgstTotal.toFixed(2);
+      document.getElementById('sgst_total').textContent = sgstTotal.toFixed(2);
+      document.getElementById('igst_total').textContent = igstTotal.toFixed(2);
+      
+      const grandTotal = total + cgstTotal + sgstTotal + igstTotal;
+      document.getElementById('grand_total').textContent = grandTotal.toFixed(2);
+    }
+
+    // Event delegation for dynamic inputs
+    document.addEventListener('input', function(e) {
+      if (e.target.closest('#lines')) {
+        calcTotals();
+      }
+    });
+
+    // Validate before submit to ensure at least one item is chosen
+    document.querySelector('form').addEventListener('submit', function(e) {
+      const hasItem = Array.from(document.querySelectorAll('input[name="item_id[]"]'))
+        .some(inp => (inp.value || '').trim() !== '');
+      if (!hasItem) {
+        e.preventDefault();
+        alert('Please select at least one item before submitting.');
+      }
+    });
+
+    // Initialize the form
+    document.addEventListener('DOMContentLoaded', async function() {
+      await loadInitialData();
+      addRow(); // Add initial empty row
+    });
+  </script>
+</body>
+</html>

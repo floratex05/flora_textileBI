@@ -1,0 +1,116 @@
+{% extends 'print/_base_document.html' %}
+{% block title %}Sales Order #{{ so['id'] }}{% endblock %}
+{% block doc_title %}SALES ORDER{% endblock %}
+{% block doc_meta_rows %}{% endblock %}
+
+
+{% block parties %}
+<div class="cols">
+  <div class="box">
+    <div class="box-title">Bill To</div>
+    <div class="box-line"><strong>{{ so['customer_name'] }}</strong></div>
+    {% if so['customer_address'] %}<div class="box-line">{{ so['customer_address'] }}</div>{% endif %}
+    <div class="box-line">{{ (so['customer_city'] or '') }}{% if so['customer_state'] %}, {{ so['customer_state'] }}{% endif %}{% if so['customer_pincode'] %} - {{ so['customer_pincode'] }}{% endif %}</div>
+    <div class="box-line">{{ (so['customer_country'] or '') }}</div>
+    {% if so['customer_email'] %}<div class="box-line">Email: {{ so['customer_email'] }}</div>{% endif %}
+    {% if so['customer_mobile'] %}<div class="box-line">Mobile: {{ so['customer_mobile'] }}</div>{% endif %}
+    {% if so['customer_phone'] %}<div class="box-line">Phone: {{ so['customer_phone'] }}</div>{% endif %}
+  </div>
+  <div class="box">
+    <div class="box-line"><strong>SO No:</strong> {{ so['so_no'] or '-' }}</div>
+    <div class="box-line"><small>(Internal SO ID: {{ so['id'] }})</small></div>
+    <div class="box-line"><strong>Date:</strong> {{ so['date'] or '-' }}</div>
+    <div class="box-line"><strong>Expected Delivery:</strong> {{ so['expected_delivery_date'] or '-' }}</div>
+  </div>
+</div>
+{% endblock %}
+
+{% block table_headers %}
+  <th class="col-sno">#</th>
+  <th class="col-item">Item</th>
+  <th class="col-num">HSN</th>
+  <th class="col-num">Qty</th>
+  <th class="col-num">Rate (₹)</th>
+  <th class="col-num">Total (₹)</th>
+  <th class="col-num">Discount (%)</th>
+  <th class="col-num">Discount Amt (₹)</th>
+  <th class="col-num">Line Total (₹)</th>
+{% endblock %}
+
+{% block table_rows %}
+  {% set ns = namespace(total=0) %}
+  {% for li in lines %}
+  {% set qty = (li['qty'] or 0)|float %}
+  {% set rate = (li['rate'] or 0)|float %}
+  {% set disc = (li['discount'] or 0)|float %}
+  {% set base = qty * rate %}
+  {% set disc_amt = [base * (disc/100.0), 0]|max %}
+  {% set computed = [base - disc_amt, 0]|max %}
+  {% set ns.total = ns.total + computed %}
+  <tr>
+    <td class="right">{{ loop.index }}</td>
+    <td>{{ li['item_sku'] or li['item_name'] or '-' }}</td>
+    <td class="right">{{ li['hsn_code'] or '' }}</td>
+    <td class="right">{{ '%.2f'|format(qty) }}</td>
+    <td class="right">{{ '%.2f'|format(rate) }}</td>
+    <td class="right">{{ '%.2f'|format(base) }}</td>
+    <td class="right">{{ '%.2f'|format(disc) }}</td>
+    <td class="right">{{ '%.2f'|format(disc_amt) }}</td>
+    <td class="right">{{ '%.2f'|format(computed) }}</td>
+  </tr>
+  {% endfor %}
+{% endblock %}
+
+{% block summary_rows %}
+  {% set sum = namespace(base=0, disc=0, total=0) %}
+  {% for li in lines %}
+    {% set qty = (li['qty'] or 0)|float %}
+    {% set rate = (li['rate'] or 0)|float %}
+    {% set disc = (li['discount'] or 0)|float %}
+    {% set base = qty * rate %}
+    {% set disc_amt = [base * (disc/100.0), 0]|max %}
+    {% set computed = [base - disc_amt, 0]|max %}
+    {% set sum.base = sum.base + base %}
+    {% set sum.disc = sum.disc + disc_amt %}
+    {% set sum.total = sum.total + computed %}
+  {% endfor %}
+  <tr>
+    <td class="label">Sub Total</td>
+    <td class="amount">₹ {{ '%.2f'|format(sum.base) }}</td>
+  </tr>
+  <tr>
+    <td class="label">Discount</td>
+    <td class="amount">- ₹ {{ '%.2f'|format(sum.disc) }}</td>
+  </tr>
+  <tr class="grand">
+    <td class="label">Grand Total</td>
+    <td class="amount">₹ {{ '%.2f'|format(sum.total) }}</td>
+  </tr>
+{% endblock %}
+
+{% block notes %}
+  {% set tot = namespace(total=0) %}
+  {% for li in lines %}
+    {% set qty = (li['qty'] or 0)|float %}
+    {% set rate = (li['rate'] or 0)|float %}
+    {% set disc = (li['discount'] or 0)|float %}
+    {% set base = qty * rate %}
+    {% set disc_amt = [base * (disc/100.0), 0]|max %}
+    {% set computed = [base - disc_amt, 0]|max %}
+    {% set tot.total = tot.total + computed %}
+  {% endfor %}
+  <div class="box-line"><strong>Amount in Words:</strong> ₹ {{ tot.total|inr_words|capitalize }}</div>
+
+  <div class="box-title" style="margin-top:8px">GST Composition Scheme Declaration:</div>
+  <div>
+    This invoice is issued under composition scheme as per Section 10 of CGST Act, 2017.<br/>
+    No input tax credit is available in respect of the tax charged on this supply.
+  </div>
+  <div class="box-title" style="margin-top:8px">Notes</div>
+  <div>{{ so['notes'] or 'Thank you for your order.' }}</div>
+{% endblock %}
+
+{% block signatures %}
+  <div class="sig">Customer Signature</div>
+  <div class="sig right">Authorized Signatory</div>
+{% endblock %}

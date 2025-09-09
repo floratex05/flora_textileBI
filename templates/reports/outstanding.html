@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Outstanding by Customer</title>
+  <style>
+    body { font-family: Arial, sans-serif; background:#f4f4f4; margin:0 }
+    .container { max-width: 1200px; margin: 20px auto; background:#fff; padding:20px; border-radius:6px; box-shadow:0 1px 6px rgba(0,0,0,0.08); }
+    h1 { margin:0 0 16px; }
+    table { width:100%; border-collapse: collapse; }
+    th, td { padding: 8px; border-bottom:1px solid #eee; text-align:left; }
+    a.button { display:inline-block; padding:8px 12px; background:#333; color:#fff; text-decoration:none; border-radius:4px; }
+    .topnav{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+    .filters{ display:flex; gap:10px; margin-bottom:10px }
+    .right { text-align:right }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="topnav">
+      <h1>Outstanding by Customer</h1>
+      <div>
+        <a href="/" class="button" style="background:#4CAF50">Dashboard</a>
+        <a href="/logout" class="button" style="background:#f44336">Logout</a>
+      </div>
+    </div>
+
+    <form method="GET" class="filters">
+      <input type="text" name="q" placeholder="Search customer" value="{{ q or '' }}"/>
+      <button type="submit" class="button">Filter</button>
+    </form>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Customer</th>
+          <th class="right">Total Invoiced</th>
+          <th class="right">Total Paid</th>
+          <th class="right">Remaining Balance</th>
+          <th class="right">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% set g = namespace(sum_out=0, sum_inv=0, sum_paid=0) %}
+        {% for r in rows %}
+        {% set g.sum_out = g.sum_out + (r['outstanding'] or 0) %}
+        {% set g.sum_inv = g.sum_inv + (r['total_invoiced'] or 0) %}
+        {% set g.sum_paid = g.sum_paid + (r['total_paid'] or 0) %}
+        <tr>
+          <td><a href="/reports/customer-ledger/{{ r['customer_id'] }}">{{ r['customer_name'] }}</a></td>
+          <td class="right">{{ '%.2f'|format(r['total_invoiced'] or 0) }}</td>
+          <td class="right">{{ '%.2f'|format(r['total_paid'] or 0) }}</td>
+          <td class="right"><strong>{{ '%.2f'|format(r['outstanding'] or 0) }}</strong></td>
+          <td class="right">
+            <a class="button" href="/print/customer-ledger/{{ r['customer_id'] }}" style="background:#2196F3">Print</a>
+            <a class="button" href="/pdf/customer-ledger/{{ r['customer_id'] }}" style="background:#9C27B0">PDF</a>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5">No outstanding found.</td></tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr>
+          <th class="right">Totals</th>
+          <th class="right">{{ '%.2f'|format(g.sum_inv) }}</th>
+          <th class="right">{{ '%.2f'|format(g.sum_paid) }}</th>
+          <th class="right">{{ '%.2f'|format(g.sum_out) }}</th>
+          <th></th>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+</body>
+</html>

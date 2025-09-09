@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>{% block title %}{% endblock %}</title>
+  <link rel="stylesheet" href="/static/print/print.css"/>
+</head>
+<body>
+<div class="doc">
+  <!-- Header -->
+  <div class="header">
+    <div class="brand">
+      <div class="brand-name">FLORA Textile BI</div>
+      <div class="brand-meta">
+        GSTIN: 29AUDPD7648G1ZG<br/>
+        1st floor, opp Head Post office, M G Road, Bijapur 586101, Karnataka, India<br/>
+        floratextile05@gmail.com | +91 9482701455, +91 9448146647
+      </div>
+    </div>
+    <div class="doc-meta right">
+      <div class="doc-title">{% block doc_title %}{% endblock %}</div>
+      <div class="doc-meta-rows">
+        {% block doc_meta_rows %}{% endblock %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Parties -->
+  {% block parties %}{% endblock %}
+
+  <!-- Items table -->
+  <table class="table">
+    <thead>
+      <tr>
+        {% block table_headers %}{% endblock %}
+      </tr>
+    </thead>
+    <tbody>
+      {% block table_rows %}{% endblock %}
+    </tbody>
+  </table>
+
+  <!-- Totals -->
+  <div class="summary">
+    <div class="summary-spacer"></div>
+    <table class="summary-table">
+      {% block summary_rows %}{% endblock %}
+    </table>
+  </div>
+
+  <!-- Notes -->
+  <div class="notes">
+    {% block notes %}{% endblock %}
+  </div>
+
+  <!-- Signatures -->
+  <div class="signatures">
+    {% block signatures %}{% endblock %}
+  </div>
+</div>
+</body>
+</html>

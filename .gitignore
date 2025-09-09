@@ -1,0 +1,25 @@
+# ---- Python ----
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# ---- Virtual Environment ----
+venv/
+venv_flora/
+.env/
+
+# ---- Environment Files ----
+.env
+*.env
+
+# ---- IDE / Editor ----
+.vscode/
+.idea/
+
+# ---- OS Files ----
+.DS_Store
+Thumbs.db
+
+# ---- Flask Instance ----
+instance/

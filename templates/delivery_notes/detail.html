@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Delivery Note #{{ dn['id'] }}</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f4f4f4; margin:0; }
+    .container { max-width: 1000px; margin: 20px auto; background:#fff; padding:20px; border-radius:6px; box-shadow:0 1px 6px rgba(0,0,0,0.08); }
+    h1 { margin:0 0 16px; }
+    table { width:100%; border-collapse: collapse; }
+    th, td { padding: 8px; border-bottom:1px solid #eee; text-align:left; }
+    a.button { display:inline-block; padding:8px 12px; background:#333; color:#fff; text-decoration:none; border-radius:4px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>DN #{{ dn['id'] }} — {{ dn['dn_no'] or '' }}</h1>
+    <div>Customer: <strong>{{ dn['customer_name'] }}</strong></div>
+    <div>Date: <strong>{{ dn['date'] or '' }}</strong></div>
+    {% if dn['so_id'] %}<div>Sales Order: <a href="/sales-orders/{{ dn['so_id'] }}">{{ dn['so_no'] or dn['so_id'] }}</a></div>{% endif %}
+
+    <h3>Items</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Item</th>
+          <th>Qty</th>
+          <th>UOM</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for li in lines %}
+        <tr>
+          <td>{{ li['item_name'] }}</td>
+          <td>{{ '%.2f'|format(li['qty'] or 0) }}</td>
+          <td>{{ li['uom'] or '' }}</td>
+          <td>{{ li['description'] or '' }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4">No items</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <div style="margin-top:12px; display:flex; gap:8px; align-items:center">
+      <a class="button" href="/delivery-notes">Back</a>
+      <a class="button" href="/print/delivery-note/{{ dn['id'] }}" style="background:#2196F3">Print</a>
+      <a class="button" href="/pdf/delivery-note/{{ dn['id'] }}" style="background:#9C27B0">PDF</a>
+    </div>
+  </div>
+</body>
+</html>

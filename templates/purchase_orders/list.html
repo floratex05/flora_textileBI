@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Purchase Orders</title>
+  <style>
+    body { font-family: Arial, sans-serif; background:#f4f4f4; margin:0; }
+    .container { max-width: 1100px; margin:20px auto; background:#fff; padding:20px; border-radius:6px; box-shadow:0 1px 6px rgba(0,0,0,0.08); }
+    h1 { margin:0 0 12px; font-size:20px; }
+
+    a.button, button.button {
+      display:inline-block; padding:6px 12px; font-size:14px; line-height:1.3;
+      background:#333; color:#fff; text-decoration:none; border:none; border-radius:4px; cursor:pointer;
+    }
+    a.button:hover, button.button:hover { background:#555; }
+
+    .topnav { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+    .nav a { margin-right:6px; }
+
+    .actions { margin-bottom:10px; display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
+
+    table { width:100%; border-collapse:collapse; margin-top:10px; }
+    th, td { padding:8px; border-bottom:1px solid #eee; text-align:left; }
+    tr:hover { background:#fafafa; }
+
+    .dropdown { position:relative; display:inline-block; }
+    .dropdown > .button { background:#333; color:#fff; }
+    .dropdown-menu { position:absolute; right:0; top:100%; background:#fff; border:1px solid #ddd; border-radius:6px; min-width:180px;
+      box-shadow:0 4px 12px rgba(0,0,0,0.12); padding:6px 0; display:none; z-index:10; }
+    .dropdown-menu a, .dropdown-menu button {
+      display:block; width:100%; text-align:left; background:none; border:none; padding:8px 12px;
+      color:#333; text-decoration:none; cursor:pointer; font-size:14px;
+    }
+    .dropdown-menu a:hover, .dropdown-menu button:hover { background:#f5f5f5; }
+    .dropdown-menu hr { border:none; border-top:1px solid #eee; margin:6px 0; }
+
+    .flash { padding:8px; border-radius:4px; margin-bottom:8px; }
+    .flash.success { background:#d4edda; color:#155724; }
+    .flash.error { background:#f8d7da; color:#721c24; }
+
+    .pagination { margin-top:12px; display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
+    .pagination a.button { background:#fff; border:1px solid #ddd; color:#333; }
+    .pagination a.button.active { background:#333; color:#fff; border-color:#333; }
+    .pagination .muted { color:#666; font-size:13px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="topnav">
+      <h1>Purchase Orders</h1>
+      <div class="nav">
+        <a href="{{ url_for('dashboard') }}" class="button" style="background:#4CAF50">Dashboard</a>
+        <a href="{{ url_for('supplier_list') }}" class="button">Suppliers</a>
+        <a href="{{ url_for('logout') }}" class="button" style="background:#f44336">Logout</a>
+      </div>
+    </div>
+
+    <div class="actions">
+      <a href="{{ url_for('po_new') }}" class="button" style="background:#2e7d32">+ New Purchase Order</a>
+
+      <form method="GET" action="{{ url_for('po_list') }}" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <input name="q" value="{{ request.args.get('q','') }}" type="text" placeholder="Search PO No / Supplier"
+          style="padding:7px 10px;width:240px;border:1px solid #ddd;border-radius:4px" />
+        <select name="status" style="padding:7px 10px;border:1px solid #ddd;border-radius:4px;min-width:140px" onchange="this.form.submit()">
+          <option value="">All Status</option>
+          <option value="Draft" {% if request.args.get('status')=='Draft' %}selected{% endif %}>Draft</option>
+          <option value="Submitted" {% if request.args.get('status')=='Submitted' %}selected{% endif %}>Submitted</option>
+          <option value="Completed" {% if request.args.get('status')=='Completed' %}selected{% endif %}>Completed</option>
+        </select>
+        <select name="per_page" style="padding:7px 10px;border:1px solid #ddd;border-radius:4px;min-width:120px" onchange="this.form.submit()">
+          {% for n in [20,50,100] %}
+          <option value="{{ n }}" {% if per_page==n %}selected{% endif %}>{{ n }} / page</option>
+          {% endfor %}
+        </select>
+        <button type="submit" class="button" style="background:#2196F3">Search</button>
+        <a class="button" href="{{ url_for('po_list') }}" style="background:#6c757d">Clear</a>
+      </form>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="flash {{ category }}">{{ message }}</div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <table id="poTable">
+      <thead>
+        <tr>
+          <th>PO No</th>
+          <th>Supplier</th>
+          <th>Date</th>
+          <th>Status</th>
+          <th>Grand Total</th>
+          <th style="width:140px">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for po in purchase_orders %}
+        <tr>
+          <td>{{ po.po_no }}</td>
+          <td>{{ po.supplier.name if po.supplier else '' }}</td>
+          <td>{{ po.date if po.date else '' }}</td>
+          <td>{{ po.status }}</td>
+          <td>{{ po.grand_total }}</td>
+          <td class="row-actions">
+            <div class="dropdown">
+              <button type="button" class="button" onclick="toggleRowDD(this)">Actions ▾</button>
+              <div class="dropdown-menu">
+                <a href="{{ url_for('po_list', po_id=po.id) }}">List</a>
+                <a href="{{ url_for('po_edit', po_id=po.id) }}">Edit</a>
+                <a href="{{ url_for('po_print', id=po.id) }}">Print</a>
+                <a href="{{ url_for('po_pdf', id=po.id) }}">PDF</a>
+                <hr/>
+                <form method="POST" action="{{ url_for('po_delete', id=po.id) }}" onsubmit="return confirm('Delete this PO?')">
+                  <button type="submit" style="color:#c62828">Delete</button>
+                </form>
+              </div>
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6">No purchase orders found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <div class="pagination">
+      {% if pagination.has_prev %}
+        <a class="button" href="{{ url_for('po_list', page=pagination.prev_num, per_page=per_page, q=request.args.get('q',''), status=request.args.get('status','')) }}">Prev</a>
+      {% endif %}
+      {% for p in pagination.iter_pages() %}
+        {% if p %}
+          <a class="button {% if p==pagination.page %}active{% endif %}" href="{{ url_for('po_list', page=p, per_page=per_page, q=request.args.get('q',''), status=request.args.get('status','')) }}">{{ p }}</a>
+        {% else %}
+          <span class="muted">…</span>
+        {% endif %}
+      {% endfor %}
+      {% if pagination.has_next %}
+        <a class="button" href="{{ url_for('po_list', page=pagination.next_num, per_page=per_page, q=request.args.get('q',''), status=request.args.get('status','')) }}">Next</a>
+      {% endif %}
+      <span class="muted">Page {{ pagination.page }} of {{ pagination.pages }} • {{ pagination.total }} POs</span>
+    </div>
+  </div>
+
+  <script>
+    function toggleRowDD(btn){
+      const menu = btn.parentElement.querySelector('.dropdown-menu');
+      const open = menu.style.display==='block';
+      document.querySelectorAll('#poTable .dropdown .dropdown-menu').forEach(m=>m.style.display='none');
+      menu.style.display = open? 'none':'block';
+    }
+    document.addEventListener('click', (e)=>{
+      const inside = e.target.closest('.dropdown');
+      if(!inside) document.querySelectorAll('.dropdown-menu').forEach(m=>m.style.display='none');
+    });
+  </script>
+</body>
+</html>

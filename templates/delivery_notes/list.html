@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Delivery Notes</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f4f4f4; margin:0; }
+    .container { max-width: 1100px; margin: 20px auto; background:#fff; padding:20px; border-radius:6px; box-shadow:0 1px 6px rgba(0,0,0,0.08); }
+    h1 { margin:0 0 16px; }
+    table { width:100%; border-collapse: collapse; }
+    th, td { padding: 8px; border-bottom:1px solid #eee; text-align:left; }
+    a.button { display:inline-block; padding:8px 12px; background:#333; color:#fff; text-decoration:none; border-radius:4px; }
+    .topnav{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+    .nav a{margin-right:8px}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="topnav">
+      <h1>Delivery Notes</h1>
+      <div class="nav">
+        <a href="/" class="button" style="background:#4CAF50">Dashboard</a>
+        <a href="/delivery-notes/new" class="button">+ New DN</a>
+        <a href="/logout" class="button" style="background:#f44336">Logout</a>
+      </div>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>DN No</th>
+          <th>Date</th>
+          <th>Customer</th>
+          <th>SO</th>
+          <th>Status</th>
+          <th style="width:220px">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+        <tr>
+          <td>{{ r['id'] }}</td>
+          <td>{{ r['dn_no'] or '' }}</td>
+          <td>{{ r['date'] or '' }}</td>
+          <td>{{ r['customer_name'] }}</td>
+          <td>{% if r['so_id'] %}<a href="/sales-orders/{{ r['so_id'] }}">{{ r['so_no'] or r['so_id'] }}</a>{% else %}-{% endif %}</td>
+          <td>{{ r['status'] or 'draft' }}</td>
+          <td>
+            <a class="button" href="/delivery-notes/{{ r['id'] }}">View</a>
+            <a class="button" href="/print/delivery-note/{{ r['id'] }}">Print</a>
+            <a class="button" href="/pdf/delivery-note/{{ r['id'] }}">PDF</a>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7">No Delivery Notes found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</body>
+</html>

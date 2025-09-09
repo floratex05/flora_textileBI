@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Purchase Invoices</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f4f4f4; margin:0; }
+    .container { max-width: 1200px; margin: 20px auto; background:#fff; padding:20px; border-radius:6px; box-shadow:0 1px 6px rgba(0,0,0,0.08); }
+    h1 { margin:0 0 16px; }
+    table { width:100%; border-collapse: collapse; }
+    th, td { padding: 8px; border-bottom:1px solid #eee; text-align:left; }
+    a.button { display:inline-block; padding:8px 12px; background:#333; color:#fff; text-decoration:none; border-radius:4px; }
+    .filters{ display:flex; gap:10px; margin-bottom:10px }
+    .topnav{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+    .nav a{margin-right:8px}
+  </style>
+  <style>
+    /* Dropdown styles */
+    .dropdown { position: relative; display: inline-block; }
+    .dropdown > .button { background:#333; }
+    .dropdown-menu { display:none; position:absolute; right:0; top:100%; background:#fff; min-width:200px; border:1px solid #ddd; border-radius:6px; box-shadow:0 4px 12px rgba(0,0,0,0.1); z-index:10; padding:4px 0; }
+    .dropdown.open .dropdown-menu { display:block; }
+    .dropdown-menu a, .dropdown-menu button { display:block; width:100%; text-align:left; padding:8px 12px; background:none; border:none; color:#333; text-decoration:none; cursor:pointer; }
+    .dropdown-menu a:hover, .dropdown-menu button:hover { background:#f5f5f5; }
+    .dropdown-menu form { margin:0; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="topnav">
+      <h1>Purchase Invoices</h1>
+      <div class="nav">
+        <a href="/" class="button" style="background:#4CAF50">Dashboard</a>
+        <a href="/purchase-invoices/new" class="button">+ New Invoice</a>
+        <a href="/logout" class="button" style="background:#f44336">Logout</a>
+      </div>
+    </div>
+
+    <form method="GET" class="filters">
+      <input type="text" name="q" placeholder="Search invoice no / supplier" value="{{ q or '' }}"/>
+      <select name="supplier_id">
+        <option value="">All suppliers</option>
+        {% for s in suppliers %}
+          <option value="{{ s['id'] }}" {{ 'selected' if supplier_id and (supplier_id|int)==s['id'] else '' }}>{{ s['name'] }}</option>
+        {% endfor %}
+      </select>
+      <select name="per_page">
+        {% for n in [20,50,100] %}
+          <option value="{{ n }}" {{ 'selected' if (per_page or 20)==n else '' }}>{{ n }} / page</option>
+        {% endfor %}
+      </select>
+      <button type="submit" class="button">Filter</button>
+      <div class="dropdown" data-dropdown>
+        <a class="button" href="#" data-dropdown-toggle>Import/Export ▾</a>
+        <div class="dropdown-menu">
+          <a href="/purchase-invoices/export.csv{% if request.query_string %}?{{ request.query_string.decode('utf-8') }}{% endif %}">Export CSV</a>
+        </div>
+      </div>
+    </form>
+
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Supplier</th>
+          <th>Invoice No</th>
+          <th>Date</th>
+          <th>Total (INR)</th>
+          <th>Tax (INR)</th>
+          <th>Grand Total (INR)</th>
+          <th>Paid (INR)</th>
+          <th>Remaining (INR)</th>
+          <th>Doc</th>
+          <th style="width:160px">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+        <tr>
+          <td>{{ r['id'] }}</td>
+          <td>{{ r['supplier_name'] }}</td>
+          <td>{{ r['supplier_invoice_no'] or '' }}</td>
+          <td>{{ r['supplier_invoice_date'] or '' }}</td>
+          <td>{{ '%.2f'|format(r['total'] or 0) }}</td>
+          <td>{{ '%.2f'|format(r['tax_total'] or 0) }}</td>
+          <td>{{ '%.2f'|format(r['grand_total'] or 0) }}</td>
+          {% set paid_total = r['paid_total'] or 0 %}
+          {% set remaining = (r['grand_total'] or 0) - paid_total %}
+          <td>{{ '%.2f'|format(paid_total) }}</td>
+          <td>{{ '%.2f'|format(remaining) }}</td>
+          <td>{% if r['invoice_doc_path'] %}<a href="/{{ r['invoice_doc_path'] }}" target="_blank">View</a>{% endif %}</td>
+          <td>
+            <div class="dropdown" data-dropdown>
+              <a class="button" href="#" data-dropdown-toggle>Actions ▾</a>
+              <div class="dropdown-menu">
+                <a href="/purchase-invoices/{{ r['id'] }}">View</a>
+                {% if remaining > 0.0001 %}
+                  <a href="/purchase-invoices/{{ r['id'] }}/payments/new">+ Add Payment</a>
+                {% endif %}
+                <a href="/print/purchase-invoice/{{ r['id'] }}">Print</a>
+                <a href="/pdf/purchase-invoice/{{ r['id'] }}">PDF</a>
+              </div>
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="9">No invoices found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <div class="pagination" style="margin-top:12px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+      <a class="button" href="{{ url_for('pinv_list', q=q, supplier_id=supplier_id, per_page=per_page, page=page-1) }}" {% if page<=1 %}style="pointer-events:none;opacity:.5"{% endif %}>Prev</a>
+      {% for p in range(1, (pages or 1)+1) %}
+        <a class="button {% if p==page %}active{% endif %}" href="{{ url_for('pinv_list', q=q, supplier_id=supplier_id, per_page=per_page, page=p) }}">{{ p }}</a>
+      {% endfor %}
+      <a class="button" href="{{ url_for('pinv_list', q=q, supplier_id=supplier_id, per_page=per_page, page=page+1) }}" {% if page>=pages %}style="pointer-events:none;opacity:.5"{% endif %}>Next</a>
+      <span class="muted">Page {{ page }} of {{ pages }} • {{ total }} PIs</span>
+    </div>
+  </div>
+  <script>
+    // Toggle dropdown on click and close when clicking outside
+    document.addEventListener('click', function (e) {
+      const isToggle = e.target.matches('[data-dropdown-toggle]');
+      const dropdown = e.target.closest('[data-dropdown]');
+      document.querySelectorAll('.dropdown.open').forEach(d => { if (!d.contains(e.target)) d.classList.remove('open'); });
+      if (isToggle && dropdown) { e.preventDefault(); dropdown.classList.toggle('open'); }
+    });
+  </script>
+</body>
+</html>

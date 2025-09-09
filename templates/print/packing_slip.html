@@ -1,0 +1,50 @@
+{% extends 'print/_base_document.html' %}
+{% block title %}Packing Slip — SI #{{ si['id'] }}{% endblock %}
+{% block doc_title %}PACKING SLIP{% endblock %}
+{% block doc_meta_rows %}{% endblock %}
+
+{% block parties %}
+<div class="cols">
+  <div class="box">
+    <div class="box-title">Ship To</div>
+    <div class="box-line"><strong>{{ si['customer_name'] }}</strong></div>
+    {% if si['customer_address'] %}<div class="box-line">{{ si['customer_address'] }}</div>{% endif %}
+    <div class="box-line">{{ (si['customer_city'] or '') }}{% if si['customer_state'] %}, {{ si['customer_state'] }}{% endif %}{% if si['customer_pincode'] %} - {{ si['customer_pincode'] }}{% endif %}</div>
+    <div class="box-line">{{ (si['customer_country'] or '') }}</div>
+    {% if si['customer_mobile'] %}<div class="box-line">Mobile: {{ si['customer_mobile'] }}</div>{% endif %}
+    {% if si['customer_phone'] %}<div class="box-line">Phone: {{ si['customer_phone'] }}</div>{% endif %}
+  </div>
+  <div class="box">
+    <div class="box-line"><strong>Invoice ID:</strong> {{ si['id'] }}</div>
+    <div class="box-line"><strong>Invoice No:</strong> {{ si['si_no'] or '-' }}</div>
+    <div class="box-line"><strong>Date:</strong> {{ si['date'] or '-' }}</div>
+  </div>
+</div>
+{% endblock %}
+
+{% block table_headers %}
+  <th class="col-sno">#</th>
+  <th class="col-item">Item</th>
+  <th class="col-num">Qty</th>
+  <th>UOM</th>
+  <th>Notes</th>
+{% endblock %}
+
+{% block table_rows %}
+  {% for li in lines %}
+  <tr>
+    <td class="right">{{ loop.index }}</td>
+    <td>{{ li['item_name'] }}</td>
+    <td class="right">{{ '%.2f'|format(li['qty'] or 0) }}</td>
+    <td class="right">{{ li['uom'] or 'Nos' }}</td>
+    <td></td>
+  </tr>
+  {% endfor %}
+{% endblock %}
+
+{% block summary_rows %}{% endblock %}
+{% block notes %}{% endblock %}
+{% block signatures %}
+  <div class="sig">Packed By</div>
+  <div class="sig right">Checked By</div>
+{% endblock %}

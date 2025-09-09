@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{ 'Edit' if item else 'New' }} Item</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f4f4f4; margin:0; }
+    .container { max-width: 900px; margin: 20px auto; background:#fff; padding:20px; border-radius:6px; box-shadow:0 1px 6px rgba(0,0,0,0.08); }
+    h1 { margin:0 0 16px; }
+    a.button, button { display:inline-block; padding:8px 12px; background:#333; color:#fff; text-decoration:none; border:none; border-radius:4px; cursor:pointer; }
+    .row { margin-bottom: 10px; display:flex; gap:10px }
+    .row label { width: 180px; text-align:right; padding-top:6px; color:#555 }
+    .row input, .row select, .row textarea { flex:1; padding:8px; border:1px solid #ddd; border-radius:4px }
+    .split { display:grid; grid-template-columns:1fr 1fr; gap:12px }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <h1>{{ 'Edit' if item else 'New' }} Item</h1>
+      <div>
+        <a href="/items" class="button">Back to Inventory</a>
+      </div>
+    </div>
+
+    {% with messages = get_flashed_messages() %}
+    {% if messages %}
+    <div>
+      {% for message in messages %}
+      <div style="padding:8px;background:#d4edda;color:#155724;border-radius:4px;margin-bottom:8px">{{ message }}</div>
+      {% endfor %}
+    </div>
+    {% endif %}
+    {% endwith %}
+
+    <form method="POST" enctype="multipart/form-data">
+      <div class="row">
+        <label>SKU</label>
+        <input type="text" name="sku" value="{{ item['sku'] if item else '' }}" />
+      </div>
+      <div class="row">
+        <label>Name</label>
+        <input type="text" required name="name" value="{{ item['name'] if item else '' }}" />
+      </div>
+      <div class="row">
+        <label>Description</label>
+        <textarea name="description">{{ item['description'] if item else '' }}</textarea>
+      </div>
+
+      <div class="split">
+        <div class="row">
+          <label>Unit of Measure</label>
+          <input type="text" name="uom" value="{{ item['uom'] if item else 'Nos' }}" />
+        </div>
+        <div class="row">
+          <label>Brand</label>
+          <input type="text" name="brand" value="{{ item['brand'] if item else '' }}" />
+        </div>
+        <div class="row">
+          <label>Supplier</label>
+          <select name="supplier_id">
+            <option value="">-- None --</option>
+            {% for s in suppliers %}
+              <option value="{{ s['id'] }}" {{ 'selected' if item and item['supplier_id'] == s['id'] else '' }}>{{ s['name'] }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="row">
+          <label>HSN Code</label>
+          <input type="text" name="hsn_code" value="{{ item['hsn_code'] if item else '' }}" />
+        </div>
+        <div class="row">
+          <label>Cost Price</label>
+          <input type="number" step="0.01" name="cost_price" value="{{ '%.2f'|format(item['cost_price']) if item and item['cost_price'] is not none else '0.00' }}" />
+        </div>
+        <div class="row">
+          <label>Selling Price</label>
+          <input type="number" step="0.01" name="selling_price" value="{{ '%.2f'|format(item['selling_price']) if item and item['selling_price'] is not none else '0.00' }}" />
+        </div>
+        <div class="row">
+          <label>GST Rate %</label>
+          <input type="number" step="0.01" name="gst_rate" value="{{ '%.2f'|format(item['gst_rate']) if item and item['gst_rate'] is not none else '0.00' }}" />
+        </div>
+        <div class="row">
+          <label>Discount %</label>
+          <input type="number" step="0.01" name="discount" value="{{ '%.2f'|format(item['discount']) if item and item['discount'] is not none else '0.00' }}" />
+        </div>
+        <div class="row">
+          <label>Stock Quantity</label>
+          <input type="number" step="0.01" name="stock_qty" value="{{ '%.2f'|format(item['stock_qty']) if item and item['stock_qty'] is not none else '0.00' }}" />
+        </div>
+        <div class="row">
+          <label>Reorder Level</label>
+          <input type="number" step="0.01" name="reorder_level" value="{{ '%.2f'|format(item['reorder_level']) if item and item['reorder_level'] is not none else '0.00' }}" />
+        </div>
+      </div>
+
+      <div class="row">
+        <label>Status</label>
+        <select name="status">
+          {% set st = (item['status'] if item else 'active') %}
+          <option value="active" {{ 'selected' if st == 'active' else '' }}>Active</option>
+          <option value="inactive" {{ 'selected' if st == 'inactive' else '' }}>Inactive</option>
+          <option value="discontinued" {{ 'selected' if st == 'discontinued' else '' }}>Discontinued</option>
+        </select>
+      </div>
+
+      <div class="row">
+        <label>Item Image</label>
+        <input type="file" name="image" accept="image/*" />
+      </div>
+      {% if item and item['image_path'] %}
+      <div class="row">
+        <label>Current Image</label>
+        <img src="/{{ item['image_path'] }}" alt="item" style="width:120px;height:120px;object-fit:cover;border:1px solid #eee;border-radius:4px"/>
+      </div>
+      {% endif %}
+
+      <div style="margin-top:12px">
+        <button type="submit">{{ 'Update' if item else 'Create' }}</button>
+      </div>
+    </form>
+  </div>
+</body>
+</html>

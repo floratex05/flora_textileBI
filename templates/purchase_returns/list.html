@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Purchase Returns</title>
+  <style>
+    body{font-family:Arial;margin:0;background:#f6f7fb} .container{max-width:1100px;margin:20px auto;background:#fff;padding:20px;border-radius:6px;box-shadow:0 1px 6px rgba(0,0,0,0.08)}
+    h1{margin:0 0 12px}
+    .toolbar{display:flex;gap:10px;align-items:center;margin-bottom:14px}
+    .toolbar input, .toolbar select{padding:6px 8px;border:1px solid #ddd;border-radius:4px}
+    table{width:100%;border-collapse:collapse}
+    th,td{border:1px solid #eee;padding:8px 10px;text-align:left}
+    th{background:#f3f4f6}
+    a.button{display:inline-block;padding:6px 10px;background:#333;color:white;text-decoration:none;border-radius:4px}
+  </style>
+</head>
+<body>
+<div class="container">
+  <div style="display:flex;justify-content:space-between;align-items:center">
+    <h1>Purchase Returns</h1>
+    <div>
+      <a class="button" href="/purchase-returns/new">+ New Return</a>
+      <a class="button" href="/dashboard" style="background:#007bff">🏠 Dashboard</a>
+    </div>
+  </div>
+
+  <form method="GET" class="toolbar">
+    <input type="text" name="q" value="{{ q or '' }}" placeholder="Search return no or supplier"/>
+    <select name="supplier_id">
+      <option value="">All Suppliers</option>
+      {% for s in suppliers %}
+        <option value="{{ s['id'] }}" {% if supplier_id and s['id']|string == supplier_id|string %}selected{% endif %}>{{ s['name'] }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit" class="button">Filter</button>
+  </form>
+
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Return No</th>
+        <th>Date</th>
+        <th>Supplier</th>
+        <th class="right">Grand Total (₹)</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in rows %}
+      <tr>
+        <td>{{ r['id'] }}</td>
+        <td>{{ r['return_no'] or ('PR#' ~ r['id']) }}</td>
+        <td>{{ r['return_date'] or '' }}</td>
+        <td>{{ r['supplier_name'] }}</td>
+        <td class="right">{{ '%.2f'|format(r['grand_total'] or 0) }}</td>
+        <td>
+          <a href="/purchase-returns/{{ r['id'] }}">View</a> |
+          <a href="/print/purchase-return/{{ r['id'] }}" target="_blank">Print</a> |
+          <a href="/pdf/purchase-return/{{ r['id'] }}">PDF</a>
+        </td>
+      </tr>
+      {% endfor %}
+      {% if not rows or rows|length == 0 %}
+      <tr><td colspan="6">No returns found.</td></tr>
+      {% endif %}
+    </tbody>
+  </table>
+</div>
+</body>
+</html>

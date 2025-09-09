@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>New Sales Invoice</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f4f4f4; margin: 0; }
+    .container { max-width: 1200px; margin: 20px auto; background: #fff; padding: 20px; border-radius: 6px; box-shadow: 0 1px 6px rgba(0,0,0,0.08); }
+    h1 { margin: 0 0 16px; }
+    a.button, button { display: inline-block; padding: 8px 12px; background: #333; color: #fff; text-decoration: none; border: none; border-radius: 4px; cursor: pointer; }
+    a.button:hover, button:hover { background: #555; }
+    .row { margin-bottom: 10px; display: flex; gap: 10px; align-items: center; }
+    .row label { width: 180px; text-align: right; color: #555; }
+    .row input, .row select, .row textarea { flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
+    .table-container { overflow-x: auto; margin-top: 10px; }
+    table { width: 100%; border-collapse: collapse; min-width: 800px; }
+    th, td { padding: 8px 12px; border: 1px solid #ddd; text-align: left; vertical-align: middle; }
+    th { background: #f8f9fa; font-weight: bold; color: #333; }
+    .col-item { width: 35%; }
+    .col-qty { width: 10%; }
+    .col-rate { width: 12%; }
+    .col-discount { width: 10%; }
+    .col-total { width: 12%; text-align: right; }
+    .col-action { width: 5%; text-align: center; }
+    td input { width: 100%; padding: 6px 8px; border: 1px solid #ddd; border-radius: 3px; font-size: 14px; box-sizing: border-box; }
+    td input[type="number"] { text-align: right; }
+    .line-total { font-weight: bold; color: #333; }
+    .remove-btn { background: #dc3545; color: white; border: none; border-radius: 3px; padding: 4px 8px; cursor: pointer; font-size: 12px; }
+    .remove-btn:hover { background: #c82333; }
+    .searchable-select { position: relative; }
+    .searchable-select input { width: 100%; padding: 6px 8px; border: 1px solid #ddd; border-radius: 3px; }
+    .searchable-select .dropdown { position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #ddd; border-top: none; max-height: 240px; overflow-y: auto; z-index: 10000; display: none; box-shadow: 0 6px 18px rgba(0,0,0,0.1); }
+    .searchable-select .dropdown.show { display: block; }
+    .searchable-select .dropdown-item { padding: 8px 12px; cursor: pointer; border-bottom: 1px solid #eee; }
+    .searchable-select .dropdown-item:hover { background: #f8f9fa; }
+    .searchable-select .dropdown-item:last-child { border-bottom: none; }
+    .totals-section { margin-top: 20px; display: flex; justify-content: flex-end; }
+    .totals-box { background: #f8f9fa; border: 1px solid #ddd; border-radius: 4px; padding: 15px; min-width: 300px; }
+    .total-row { display: flex; justify-content: space-between; margin-bottom: 8px; }
+    .total-row:last-child { margin-bottom: 0; font-size: 16px; font-weight: bold; border-top: 1px solid #ddd; padding-top: 8px; margin-top: 8px; }
+    .total-label { color: #555; }
+    .total-amount { font-weight: bold; color: #333; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <h1>New Sales Invoice</h1>
+      <div style="display:flex;gap:10px;">
+        <a href="javascript:history.back()" class="button" style="background:#6c757d;">← Back</a>
+        <a href="/" class="button" style="background:#4CAF50">Dashboard</a>
+      </div>
+    </div>
+
+    <form method="POST">
+      <div class="row">
+        <label>Customer</label>
+        <select name="customer_id" required id="customerSelect">
+          <option value="">Select Customer</option>
+        </select>
+      </div>
+      <div class="row">
+        <label>Invoice No</label>
+        <input type="text" name="si_no" placeholder="Auto-generated if empty"/>
+      </div>
+      <div class="row">
+        <label>Invoice Date</label>
+        <input type="date" name="date" value="{{ date_today }}"/>
+      </div>
+      <div class="row">
+        <label>Notes</label>
+        <textarea name="notes" placeholder="Reference SO / delivery info..."></textarea>
+      </div>
+
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th class="col-item">Item</th>
+              <th class="col-qty">Qty</th>
+              <th class="col-rate">Rate (₹)</th>
+              <th class="col-discount">Discount (%)</th>
+              <th class="col-total">Line Total (₹)</th>
+              <th class="col-action"></th>
+            </tr>
+          </thead>
+          <tbody id="lines"></tbody>
+        </table>
+      </div>
+      
+      <div style="margin-top: 12px;">
+        <button type="button" onclick="addRow()">+ Add Line Item</button>
+      </div>
+
+      <div class="totals-section">
+        <div class="totals-box">
+          <div class="total-row">
+            <span class="total-label">Sub Total:</span>
+            <span class="total-amount">₹<span id="total">0.00</span></span>
+          </div>
+          <div class="total-row">
+            <span class="total-label">Grand Total:</span>
+            <span class="total-amount">₹<span id="grand_total">0.00</span></span>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top: 20px;">
+        <button type="submit" style="background: #28a745; padding: 12px 24px; font-size: 16px;">Submit Sales Invoice</button>
+      </div>
+    </form>
+  </div>
+
+  <script>
+    window.items = [];
+    window.customers = [];
+
+    async function loadInitialData() {
+      try {
+        const customersResponse = await fetch('/api/customers');
+        if (customersResponse.ok) {
+          window.customers = await customersResponse.json();
+          populateCustomerDropdown();
+        }
+        const itemsResponse = await fetch('/api/items/search?limit=50');
+        if (itemsResponse.ok) {
+          window.items = await itemsResponse.json();
+        }
+      } catch (error) { console.error('Error loading initial data:', error); }
+    }
+
+    function populateCustomerDropdown() {
+      const select = document.getElementById('customerSelect');
+      select.innerHTML = '<option value="">Select Customer</option>';
+      window.customers.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.id; opt.textContent = c.name; select.appendChild(opt);
+      });
+    }
+
+    async function searchItems(query) {
+      try {
+        const url = query && query.trim() ? `/api/items/search?q=${encodeURIComponent(query)}&limit=20` : `/api/items/search?limit=20`;
+        const response = await fetch(url);
+        if (response.ok) { const data = await response.json(); return Array.isArray(data) ? data : []; }
+      } catch (e) { console.error(e); }
+      return [];
+    }
+
+    function createSearchableSelect(selectedItemId = '', rowElement = null) {
+      const div = document.createElement('div');
+      div.className = 'searchable-select';
+      const input = document.createElement('input');
+      input.type = 'text'; input.placeholder = 'Search items...'; input.autocomplete = 'off';
+      const dropdown = document.createElement('div'); dropdown.className = 'dropdown';
+      const hiddenInput = document.createElement('input'); hiddenInput.type = 'hidden'; hiddenInput.name = 'item_id[]';
+      div.appendChild(input); div.appendChild(dropdown); div.appendChild(hiddenInput);
+      let searchTimeout;
+      async function updateDropdown(searchTerm = '') {
+        let items = searchTerm.trim() ? await searchItems(searchTerm) : window.items.slice(0, 20);
+        dropdown.innerHTML = '';
+        items.forEach(item => {
+          const itemDiv = document.createElement('div');
+          itemDiv.className = 'dropdown-item';
+          itemDiv.textContent = `${item.name}${item.sku ? ' (' + item.sku + ')' : ''}`;
+          itemDiv.addEventListener('click', () => { selectItem(item); });
+          dropdown.appendChild(itemDiv);
+        });
+      }
+      function selectItem(item) {
+        input.value = `${item.name}${item.sku ? ' (' + item.sku + ')' : ''}`;
+        hiddenInput.value = item.id;
+        dropdown.classList.remove('show');
+        if (rowElement) autoPopulateRow(rowElement, item);
+        calcTotals();
+      }
+      input.addEventListener('focus', () => { updateDropdown(input.value || ''); dropdown.classList.add('show'); });
+      input.addEventListener('input', (e) => { clearTimeout(searchTimeout); searchTimeout = setTimeout(() => { updateDropdown(e.target.value); dropdown.classList.add('show'); }, 300); hiddenInput.value=''; });
+      document.addEventListener('click', (e) => { if (!div.contains(e.target)) dropdown.classList.remove('show'); });
+      if (selectedItemId) {
+        const item = window.items.find(i => i.id == selectedItemId);
+        if (item) { input.value = `${item.name}${item.sku ? ' (' + item.sku + ')' : ''}`; hiddenInput.value = item.id; }
+      }
+      return div;
+    }
+
+    function autoPopulateRow(rowElement, item) {
+      const rateInput = rowElement.querySelector('[name="rate[]"]');
+      if (rateInput && (!rateInput.value || rateInput.value == '0')) {
+        rateInput.value = item.selling_price || 0; // sales uses selling price
+      }
+      const discountInput = rowElement.querySelector('[name="discount[]"]');
+      if (discountInput && (!discountInput.value || discountInput.value == '0')) {
+        discountInput.value = item.discount || 0;
+      }
+      if (item.stock_qty !== undefined) {
+        const qtyInput = rowElement.querySelector('[name="qty[]"]');
+        if (qtyInput) qtyInput.title = `Available stock: ${item.stock_qty} ${item.uom || 'Nos'}`;
+      }
+    }
+
+    function addRow(pref = {}) {
+      const tbody = document.getElementById('lines');
+      const tr = document.createElement('tr');
+
+      const itemCell = document.createElement('td');
+      const searchableSelect = createSearchableSelect(pref.item_id, tr);
+      itemCell.appendChild(searchableSelect); tr.appendChild(itemCell);
+
+      const qtyCell = document.createElement('td');
+      const qtyInput = document.createElement('input');
+      qtyInput.type = 'number'; qtyInput.step = '0.01'; qtyInput.name = 'qty[]'; qtyInput.value = (pref.qty ?? 1); qtyInput.required = true; qtyInput.min = '0.01';
+      qtyCell.appendChild(qtyInput); tr.appendChild(qtyCell);
+
+      const rateCell = document.createElement('td');
+      const rateInput = document.createElement('input');
+      rateInput.type = 'number'; rateInput.step = '0.01'; rateInput.name = 'rate[]'; rateInput.value = (pref.rate ?? 0); rateInput.required = true;
+      rateCell.appendChild(rateInput); tr.appendChild(rateCell);
+
+      const discCell = document.createElement('td');
+      const discInput = document.createElement('input');
+      discInput.type = 'number'; discInput.step = '0.01'; discInput.name = 'discount[]'; discInput.value = (pref.discount ?? 0);
+      discCell.appendChild(discInput); tr.appendChild(discCell);
+
+      const totalCell = document.createElement('td');
+      const totalSpan = document.createElement('span'); totalSpan.className = 'line-total'; totalSpan.textContent = '0.00'; totalCell.appendChild(totalSpan); tr.appendChild(totalCell);
+
+      const actionCell = document.createElement('td');
+      const removeBtn = document.createElement('button'); removeBtn.type = 'button'; removeBtn.className = 'remove-btn'; removeBtn.textContent = 'Remove';
+      removeBtn.addEventListener('click', () => { tr.remove(); calcTotals(); });
+      actionCell.appendChild(removeBtn); tr.appendChild(actionCell);
+
+      tbody.appendChild(tr);
+      calcTotals();
+    }
+
+    function calcTotals() {
+      const rows = document.querySelectorAll('#lines tr');
+      let total = 0.0;
+      rows.forEach(tr => {
+        const qty = parseFloat(tr.querySelector('[name="qty[]"]').value || '0');
+        const rate = parseFloat(tr.querySelector('[name="rate[]"]').value || '0');
+        const disc = parseFloat(tr.querySelector('[name="discount[]"]').value || '0');
+        const base = qty * rate;
+        const sub = Math.max(base * (disc ? (1 - (disc/100.0)) : 1), 0);
+        total += sub;
+        const span = tr.querySelector('.line-total');
+        if (span) span.textContent = sub.toFixed(2);
+      });
+      document.getElementById('total').textContent = total.toFixed(2);
+      document.getElementById('grand_total').textContent = total.toFixed(2);
+    }
+
+    document.addEventListener('input', (e) => {
+      if (['qty[]','rate[]','discount[]'].includes(e.target.name)) calcTotals();
+    });
+
+    window.addEventListener('load', loadInitialData);
+  </script>
+</body>
+</html>

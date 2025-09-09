@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>New Delivery Note</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f4f4f4; margin: 0; }
+    .container { max-width: 1100px; margin: 20px auto; background: #fff; padding: 20px; border-radius: 6px; box-shadow: 0 1px 6px rgba(0,0,0,0.08); }
+    h1 { margin: 0 0 16px; }
+    a.button, button { display: inline-block; padding: 8px 12px; background: #333; color: #fff; text-decoration: none; border: none; border-radius: 4px; cursor: pointer; }
+    .row { margin-bottom: 10px; display: flex; gap: 10px; align-items: center; }
+    .row label { width: 180px; text-align: right; color: #555; }
+    .row input, .row select, .row textarea { flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 8px 10px; border: 1px solid #ddd; text-align: left; }
+    th { background: #f8f9fa; }
+    .col-item { width: 45%; }
+    .col-qty { width: 15%; }
+    .col-uom { width: 15%; }
+    .col-desc { width: 25%; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <h1>New Delivery Note</h1>
+      <div style="display:flex;gap:10px;">
+        <a href="/delivery-notes" class="button" style="background:#6c757d;">← Back</a>
+      </div>
+    </div>
+
+    <form method="POST">
+      <div class="row">
+        <label>Sales Invoice</label>
+        <select name="si_id" id="siSelect">
+          <option value="">None</option>
+          {% for si in sales_invoices %}
+            <option value="{{ si['id'] }}">{{ si['si_no'] or ('SI-' + (si['id']|string)) }} — {{ si['customer_name'] }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="row">
+        <label>Sales Order</label>
+        <select name="so_id" id="soSelect">
+          <option value="">None</option>
+          {% for so in sales_orders %}
+            <option value="{{ so['id'] }}">{{ so['so_no'] or ('SO-'+so['id']|string) }} — {{ so['customer_name'] }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="row">
+        <label>Customer</label>
+        <select name="customer_id" id="customerSelect" required>
+          {% for c in customers %}
+            <option value="{{ c['id'] }}" {% if selected_customer_id and selected_customer_id==c['id'] %}selected{% endif %}>{{ c['name'] }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="row">
+        <label>Date</label>
+        <input type="date" name="date" value="{{ date_today }}" />
+      </div>
+      <div class="row">
+        <label>DN No</label>
+        <input type="text" name="dn_no" placeholder="Auto-generated if empty" />
+      </div>
+      <div class="row">
+        <label>Notes</label>
+        <textarea name="notes" rows="2" placeholder="Optional"></textarea>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th class="col-item">Item</th>
+            <th class="col-qty">Qty</th>
+            <th class="col-uom">UOM</th>
+            <th class="col-desc">Description</th>
+          </tr>
+        </thead>
+        <tbody id="lines">
+          {% for li in prefill_lines %}
+          <tr>
+            <td>
+              <select name="item_id[]" required>
+                {% for it in items %}
+                  <option value="{{ it['id'] }}" {{ 'selected' if it['id']==li['item_id'] else '' }}>{{ it['name'] }}{% if it['sku'] %} ({{ it['sku'] }}){% endif %}</option>
+                {% endfor %}
+              </select>
+            </td>
+            <td><input type="number" name="qty[]" step="0.01" value="{{ '%.2f'|format(li['qty'] or 0) }}" required /></td>
+            <td><input type="text" name="uom[]" value="{{ li['uom'] or 'Nos' }}" /></td>
+            <td><input type="text" name="description[]" value="" /></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <div style="margin-top:12px;display:flex;gap:8px">
+        <button type="submit" style="background:#28a745">Save</button>
+      </div>
+    </form>
+  </div>
+
+  <script>
+    // If SO selected, set customer accordingly
+    document.getElementById('soSelect').addEventListener('change', function() {
+      const soId = this.value;
+      if (!soId) return;
+      const option = this.options[this.selectedIndex].textContent;
+      // Server pre-fills on GET; for POST we rely on selection
+    });
+  </script>
+</body>
+</html>

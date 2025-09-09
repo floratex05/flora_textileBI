@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Edit Sales Invoice #{{ si['id'] }}</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f4f4f4; margin: 0; }
+    .container { max-width: 1200px; margin: 20px auto; background: #fff; padding: 20px; border-radius: 6px; box-shadow: 0 1px 6px rgba(0,0,0,0.08); }
+    h1 { margin: 0 0 16px; }
+    a.button, button { display: inline-block; padding: 8px 12px; background: #333; color: #fff; text-decoration: none; border: none; border-radius: 4px; cursor: pointer; }
+    a.button:hover, button:hover { background: #555; }
+    .row { margin-bottom: 10px; display: flex; gap: 10px; align-items: center; }
+    .row label { width: 150px; text-align: right; color: #555; }
+    .row input, .row select, .row textarea { flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
+    .table-container { overflow-x: auto; margin-top: 10px; }
+    table { width: 100%; border-collapse: collapse; min-width: 800px; }
+    th, td { padding: 8px 12px; border: 1px solid #ddd; text-align: left; vertical-align: middle; }
+    th { background: #f8f9fa; font-weight: bold; color: #333; }
+    .col-item { width: 35%; }
+    .col-qty { width: 10%; }
+    .col-rate { width: 12%; }
+    .col-discount { width: 10%; }
+    .col-total { width: 12%; text-align: right; }
+    .col-action { width: 5%; text-align: center; }
+    td input { width: 100%; padding: 6px 8px; border: 1px solid #ddd; border-radius: 3px; font-size: 14px; box-sizing: border-box; }
+    td input[type="number"] { text-align: right; }
+    .line-total { font-weight: bold; color: #333; }
+    .remove-btn { background: #dc3545; color: white; border: none; border-radius: 3px; padding: 4px 8px; cursor: pointer; font-size: 12px; }
+    .remove-btn:hover { background: #c82333; }
+    .form-actions { display:flex; gap:10px; margin-top:16px }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <h1>Edit Sales Invoice #{{ si['id'] }}</h1>
+      <div style="display:flex;gap:10px;">
+        <a href="/sales-invoices/{{ si['id'] }}" class="button" style="background:#6c757d;">← Back</a>
+        <a href="/dashboard" class="button" style="background:#007bff;">🏠 Dashboard</a>
+      </div>
+    </div>
+
+    <form method="POST">
+      <div class="row">
+        <label>Customer</label>
+        <select name="customer_id" required>
+          {% for c in customers %}
+            <option value="{{ c['id'] }}" {{ 'selected' if c['id']==si['customer_id'] else '' }}>{{ c['name'] }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="row">
+        <label>Invoice No</label>
+        <input type="text" name="si_no" value="{{ si['si_no'] or '' }}"/>
+      </div>
+      <div class="row">
+        <label>Invoice Date</label>
+        <input type="date" name="date" value="{{ si['date'] or date_today }}"/>
+      </div>
+      <div class="row">
+        <label>Notes</label>
+        <textarea name="notes">{{ si['notes'] or '' }}</textarea>
+      </div>
+
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th class="col-item">Item</th>
+              <th class="col-qty">Qty</th>
+              <th class="col-rate">Rate (₹)</th>
+              <th class="col-discount">Discount (%)</th>
+              <th class="col-total">Line Total (₹)</th>
+              <th class="col-action"></th>
+            </tr>
+          </thead>
+          <tbody id="lines">
+            {% for li in lines %}
+            <tr>
+              <td>
+                <select name="item_id[]" required>
+                  {% for it in items %}
+                    <option value="{{ it['id'] }}" {{ 'selected' if it['id']==li['item_id'] else '' }}>{{ it['name'] }}{% if it['sku'] %} ({{ it['sku'] }}){% endif %}</option>
+                  {% endfor %}
+                </select>
+              </td>
+              <td><input type="number" name="qty[]" step="0.01" value="{{ '%.2f'|format(li['qty'] or 0) }}" required /></td>
+              <td><input type="number" name="rate[]" step="0.01" value="{{ '%.2f'|format(li['rate'] or 0) }}" required /></td>
+              <td><input type="number" name="discount[]" step="0.01" value="{{ '%.2f'|format(li['discount'] or 0) }}" /></td>
+              <td class="line-total">{{ '%.2f'|format(li['line_total'] or 0) }}</td>
+              <td><button type="button" class="remove-btn" onclick="this.closest('tr').remove();">Remove</button></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="form-actions">
+        <button type="button" onclick="addRow()">+ Add Line Item</button>
+        <button type="submit" style="background:#28a745">Save Changes</button>
+      </div>
+    </form>
+  </div>
+
+  <script>
+    const items = {{ items|tojson }};
+
+    function calcRowTotal(tr) {
+      const qty = parseFloat(tr.querySelector('[name="qty[]"]').value || '0');
+      const rate = parseFloat(tr.querySelector('[name="rate[]"]').value || '0');
+      const disc = parseFloat(tr.querySelector('[name="discount[]"]').value || '0');
+      const base = qty * rate;
+      const sub = Math.max(base * (1 - (disc/100.0)), 0);
+      tr.querySelector('.line-total').textContent = sub.toFixed(2);
+    }
+
+    function wireRowEvents(tr) {
+      const sel = tr.querySelector('select[name="item_id[]"]');
+      const rateInput = tr.querySelector('[name="rate[]"]');
+      const discInput = tr.querySelector('[name="discount[]"]');
+      const qtyInput = tr.querySelector('[name="qty[]"]');
+
+      sel.addEventListener('change', () => {
+        const val = sel.value;
+        const item = items.find(i => String(i.id) === String(val));
+        if (item) {
+          if (!rateInput.value || parseFloat(rateInput.value) === 0) rateInput.value = (item.selling_price || 0);
+          if (!discInput.value || parseFloat(discInput.value) === 0) discInput.value = (item.discount || 0);
+          calcRowTotal(tr);
+        }
+      });
+
+      [rateInput, discInput, qtyInput].forEach(inp => inp.addEventListener('input', () => calcRowTotal(tr)));
+    }
+
+    // Wire existing rows on load
+    window.addEventListener('load', () => {
+      document.querySelectorAll('#lines tr').forEach(tr => wireRowEvents(tr));
+    });
+
+    function addRow() {
+      const tbody = document.getElementById('lines');
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>
+          <select name="item_id[]" required>
+            ${items.map(i => `<option value="${i.id}">${i.name}${i.sku ? ' ('+i.sku+')' : ''}</option>`).join('')}
+          </select>
+        </td>
+        <td><input type="number" name="qty[]" step="0.01" value="1" required /></td>
+        <td><input type="number" name="rate[]" step="0.01" value="0" required /></td>
+        <td><input type="number" name="discount[]" step="0.01" value="0" /></td>
+        <td class="line-total">0.00</td>
+        <td><button type="button" class="remove-btn" onclick="this.closest('tr').remove();">Remove</button></td>
+      `;
+      tbody.appendChild(tr);
+      wireRowEvents(tr);
+    }
+  </script>
+</body>
+</html>

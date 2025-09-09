@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Sales Orders</title>
+  <style>
+    body { font-family: Arial, sans-serif; background:#f4f4f4; margin:0; }
+    .container { max-width:1200px; margin:20px auto; background:#fff; padding:20px; border-radius:6px; box-shadow:0 1px 6px rgba(0,0,0,0.08); }
+    h1 { margin-bottom:15px; }
+    .topnav{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+    .nav a{margin-right:8px}
+    a.button, .button { display:inline-block; padding:8px 12px; background:#333; color:#fff; text-decoration:none; border:none; border-radius:4px; cursor:pointer; }
+    table { width:100%; border-collapse:collapse; margin-top:12px; }
+    th, td { padding:8px; border-bottom:1px solid #eee; text-align:left; }
+    tr:hover { background:#fafafa; }
+    .row-actions form { display:inline; }
+    .pagination { margin-top:12px; display:flex; gap:6px; flex-wrap:wrap; align-items:center }
+    .pagination a{padding:6px 10px;border:1px solid #ddd;background:#fff;border-radius:4px;cursor:pointer;text-decoration:none;color:#333}
+    .pagination a.active{background:#333;color:#fff;border-color:#333}
+    .pagination .muted{color:#666}
+    /* Dropdown styles */
+    .dropdown{position:relative;display:inline-block}
+    .dropdown > .button{background:#333;color:#fff}
+    .dropdown-menu{position:absolute;right:0;top:100%;background:#fff;border:1px solid #ddd;border-radius:6px;min-width:180px;box-shadow:0 4px 12px rgba(0,0,0,0.12);padding:6px 0;display:none;z-index:10}
+    .dropdown-menu a, .dropdown-menu button{display:block;width:100%;text-align:left;background:none;border:none;padding:8px 12px;color:#333;text-decoration:none;cursor:pointer}
+    .dropdown-menu a:hover, .dropdown-menu button:hover{background:#f5f5f5}
+    .dropdown-menu hr{border:none;border-top:1px solid #eee;margin:6px 0}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="topnav">
+      <h1>Sales Orders</h1>
+      <div class="nav">
+        <a href="/" class="button" style="background:#4CAF50">Dashboard</a>
+        <a href="/customers" class="button">Customers</a>
+        <a href="/leads" class="button">Leads</a>
+        <a href="/opportunities" class="button">Opportunities</a>
+        <a href="/logout" class="button" style="background:#f44336">Logout</a>
+      </div>
+    </div>
+
+    <div class="actions" style="margin-bottom:12px">
+      <a href="{{ url_for('salesorder_new') }}" class="button" style="background:#4CAF50">+ New Sales Order</a>
+      <form method="get" action="{{ url_for('salesorder_list') }}" style="display:inline-block;margin-left:10px">
+        <input type="text" name="q" placeholder="Search SO No / Customer" value="{{ request.args.get('q','') }}"
+               style="padding:7px 10px;width:240px;border:1px solid #ddd;border-radius:4px">
+        <select name="status" style="padding:7px 10px;border:1px solid #ddd;border-radius:4px">
+          <option value="">All Status</option>
+          <option value="draft" {{ 'selected' if request.args.get('status')=='draft' else '' }}>Draft</option>
+          <option value="confirmed" {{ 'selected' if request.args.get('status')=='confirmed' else '' }}>Confirmed</option>
+          <option value="closed" {{ 'selected' if request.args.get('status')=='closed' else '' }}>Closed</option>
+        </select>
+        <button type="submit" class="button" style="background:#2196F3">Filter</button>
+        <a href="{{ url_for('salesorder_list') }}" class="button" style="background:#607D8B">Clear</a>
+      </form>
+    </div>
+
+    {% with messages = get_flashed_messages() %}
+    {% if messages %}
+    <div>
+      {% for message in messages %}
+      <div style="padding:8px;background:#d4edda;color:#155724;border-radius:4px;margin-bottom:8px">{{ message }}</div>
+      {% endfor %}
+    </div>
+    {% endif %}
+    {% endwith %}
+
+    <table id="soTable">
+      <thead>
+        <tr>
+          <th>SO No</th>
+          <th>Customer</th>
+          <th>Date</th>
+          <th>Total</th>
+          <th>Status</th>
+          <th style="width:180px">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for so in sales_orders %}
+        <tr>
+          <td>{{ so.so_no }}</td>
+          <td>{{ so.customer_name }}</td>
+          <td>{{ so.date }}</td>
+          <td>{{ "%.2f"|format(so.grand_total or 0) }}</td>
+          <td>{{ so.status }}</td>
+          <td class="row-actions">
+            <div class="dropdown">
+              <button type="button" class="button" onclick="toggleRowDD(this)">Actions ▾</button>
+              <div class="dropdown-menu">
+                <a href="{{ url_for('salesorder_edit', so_id=so.id) }}">Edit</a>
+                <a href="{{ url_for('salesinvoice_from_so', so_id=so.id) }}">Create Invoice</a>
+                <a href="{{ url_for('salesorder_print', id=so.id) }}">Print</a>
+                <a href="{{ url_for('salesorder_pdf', id=so.id) }}">Download PDF</a>
+                <hr/>
+                <form method="POST" action="{{ url_for('salesorder_delete', id=so.id) }}" onsubmit="return confirm('Delete this Sales Order?')">
+                  <button type="submit" style="color:#c62828">Delete</button>
+                </form>
+              </div>
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6">No sales orders found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <div class="pagination">
+      {% if page > 1 %}
+        <a href="{{ url_for('salesorder_list', page=page-1, q=request.args.get('q'), status=request.args.get('status')) }}">Prev</a>
+      {% endif %}
+      {% for p in range(1, (total_pages or 1)+1) %}
+        <a class="{% if p==page %}active{% endif %}" href="{{ url_for('salesorder_list', page=p, q=request.args.get('q'), status=request.args.get('status')) }}">{{ p }}</a>
+      {% endfor %}
+      {% if page < total_pages %}
+        <a href="{{ url_for('salesorder_list', page=page+1, q=request.args.get('q'), status=request.args.get('status')) }}">Next</a>
+      {% endif %}
+      <span class="muted">Page {{ page }} of {{ total_pages }}</span>
+    </div>
+  </div>
+
+  <script>
+    function toggleRowDD(btn){
+      const menu = btn.parentElement.querySelector('.dropdown-menu');
+      const open = menu.style.display === 'block';
+      document.querySelectorAll('#soTable .dropdown .dropdown-menu').forEach(m => m.style.display='none');
+      menu.style.display = open ? 'none' : 'block';
+    }
+    document.addEventListener('click', (e) => {
+      const inside = e.target.closest('.dropdown');
+      if (!inside) document.querySelectorAll('.dropdown-menu').forEach(m => m.style.display='none');
+    });
+  </script>
+</body>
+</html>

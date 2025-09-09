@@ -1,0 +1,58 @@
+{% extends 'print/_base_document.html' %}
+{% block title %}Delivery Note — PR #{{ pr['id'] }}{% endblock %}
+{% block doc_title %}DELIVERY NOTE (Purchase Return){% endblock %}
+{% block doc_meta_rows %}
+  <div class="meta-row"><strong>Return ID:</strong> {{ pr['id'] }}</div>
+  <div class="meta-row"><strong>Return No:</strong> {{ pr['return_no'] or ('PR#' ~ pr['id']) }}</div>
+  <div class="meta-row"><strong>Date:</strong> {{ pr['return_date'] or '-' }}</div>
+{% endblock %}
+
+{% block parties %}
+<div class="cols">
+  <div class="box">
+    <div class="box-title">Deliver To</div>
+    <div class="box-line"><strong>{{ pr['name'] }}</strong></div>
+    {% if pr['address'] %}<div class="box-line">{{ pr['address'] }}</div>{% endif %}
+    <div class="box-line">{{ (pr['city'] or '') }}{% if pr['state'] %}, {{ pr['state'] }}{% endif %}{% if pr['pincode'] %} - {{ pr['pincode'] }}{% endif %}</div>
+    {% if pr['phone'] %}<div class="box-line">Phone: {{ pr['phone'] }}</div>{% endif %}
+  </div>
+  <div class="box">
+    <div class="box-line"><strong>Reference:</strong> Purchase Return</div>
+    {% if pr['linked_purchase_invoice_id'] %}
+    <div class="box-line"><strong>Linked PI:</strong> #{{ pr['linked_purchase_invoice_id'] }}</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block table_headers %}
+  <th class="col-sno">#</th>
+  <th class="col-item">Item</th>
+  <th class="col-num">Qty</th>
+  <th>UOM</th>
+  <th>Notes</th>
+{% endblock %}
+
+{% block table_rows %}
+  {% for li in lines %}
+  <tr>
+    <td class="right">{{ loop.index }}</td>
+    <td>{{ li['item_name'] }}</td>
+    <td class="right">{{ '%.2f'|format(li['qty'] or 0) }}</td>
+    <td class="right">{{ li['uom'] or 'Nos' }}</td>
+    <td></td>
+  </tr>
+  {% endfor %}
+{% endblock %}
+
+{% block summary_rows %}{% endblock %}
+{% block notes %}
+  {% if pr['notes'] %}
+  <div class="box-title">Notes</div>
+  <div>{{ pr['notes'] }}</div>
+  {% endif %}
+{% endblock %}
+{% block signatures %}
+  <div class="sig">Dispatched By</div>
+  <div class="sig right">Received By</div>
+{% endblock %}

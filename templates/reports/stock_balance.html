@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Stock Balance</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f4f4f4; margin:0; }
+    .container { max-width: 1200px; margin: 20px auto; background:#fff; padding:20px; border-radius:6px; box-shadow:0 1px 6px rgba(0,0,0,0.08); }
+    h1 { margin:0 0 16px; }
+    table { width:100%; border-collapse: collapse; }
+    th, td { padding: 8px; border-bottom:1px solid #eee; text-align:left; }
+    .filters{ display:flex; gap:10px; margin-bottom:10px }
+    a.button { display:inline-block; padding:8px 12px; background:#333; color:#fff; text-decoration:none; border-radius:4px; }
+    .topnav{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+    .nav a{margin-right:8px}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="topnav">
+      <h1>Stock Balance</h1>
+      <div class="nav">
+        <a href="/" class="button" style="background:#4CAF50">Dashboard</a>
+        <a href="/items" class="button">Inventory</a>
+        <a href="/logout" class="button" style="background:#f44336">Logout</a>
+      </div>
+    </div>
+
+    <form method="GET" class="filters">
+      <input type="text" name="q" placeholder="Search name/SKU/brand" value="{{ request.args.get('q','') }}"/>
+      <select name="supplier_id">
+        <option value="">All suppliers</option>
+        {% for s in suppliers %}
+          <option value="{{ s['id'] }}" {{ 'selected' if request.args.get('supplier_id') and request.args.get('supplier_id')|int == s['id'] else '' }}>{{ s['name'] }}</option>
+        {% endfor %}
+      </select>
+      <select name="status">
+        <option value="">Any status</option>
+        {% for st in ['active','inactive','discontinued'] %}
+          <option value="{{ st }}" {{ 'selected' if request.args.get('status') == st else '' }}>{{ st }}</option>
+        {% endfor %}
+      </select>
+      <button type="submit" class="button">Filter</button>
+      <a class="button" href="/reports/stock-balance/export.csv{% if request.query_string %}?{{ request.query_string.decode('utf-8') }}{% endif %}">Export CSV</a>
+    </form>
+
+    <table>
+      <thead>
+        <tr>
+          <th>SKU</th>
+          <th>Name</th>
+          <th>Brand</th>
+          <th>UOM</th>
+          <th>Supplier</th>
+          <th>Stock Qty</th>
+          <th>Reorder</th>
+          <th>Cost Price</th>
+          <th>Stock Value</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% set total_value = 0 %}
+        {% for r in rows %}
+          {% set value = (r['stock_qty'] or 0) * (r['cost_price'] or 0) %}
+          {% set total_value = total_value + value %}
+          <tr>
+            <td>{{ r['sku'] or '' }}</td>
+            <td>{{ r['name'] }}</td>
+            <td>{{ r['brand'] or '' }}</td>
+            <td>{{ r['uom'] or '' }}</td>
+            <td>{{ r['supplier_name'] or '' }}</td>
+            <td>{{ '%.2f'|format(r['stock_qty'] or 0) }}</td>
+            <td>{{ '%.2f'|format(r['reorder_level'] or 0) }}</td>
+            <td>{{ '%.2f'|format(r['cost_price'] or 0) }}</td>
+            <td>{{ '%.2f'|format(value) }}</td>
+            <td>{{ r['status'] or '' }}</td>
+          </tr>
+        {% else %}
+          <tr><td colspan="10">No data</td></tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr>
+          <td colspan="8" style="text-align:right;font-weight:bold">Total Value</td>
+          <td style="font-weight:bold">{{ '%.2f'|format(total_value) }}</td>
+          <td></td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+</body>
+</html>

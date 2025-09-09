@@ -1,0 +1,93 @@
+{% extends 'print/_base_document.html' %}
+{% block title %}Purchase Invoice #{{ pi['id'] }}{% endblock %}
+{% block doc_title %}PURCHASE INVOICE{% endblock %}
+{% block doc_meta_rows %}
+  <div class="meta-row"><strong>Invoice ID:</strong> {{ pi['id'] }}</div>
+  <div class="meta-row"><strong>Supplier Invoice No:</strong> {{ pi['supplier_invoice_no'] or '-' }}</div>
+  <div class="meta-row"><strong>Date:</strong> {{ pi['supplier_invoice_date'] or '-' }}</div>
+{% endblock %}
+
+{% block parties %}
+<div class="cols">
+  <div class="box">
+    <div class="box-title">Supplier</div>
+    {% if supplier %}
+      <div class="box-line"><strong>{{ supplier['name'] }}</strong></div>
+      {% if supplier['gstin'] %}<div class="box-line">GSTIN: {{ supplier['gstin'] }}</div>{% endif %}
+      {% if supplier['address'] %}<div class="box-line">{{ supplier['address'] }}</div>{% endif %}
+      {% if supplier['city'] or supplier['state'] or supplier['pincode'] %}
+        <div class="box-line">{{ supplier['city'] or '' }} {{ supplier['pincode'] or '' }} {{ supplier['state'] or '' }}</div>
+      {% endif %}
+      {% if supplier['phone'] %}<div class="box-line">Phone: {{ supplier['phone'] }}</div>{% endif %}
+      {% if supplier['email'] %}<div class="box-line">Email: {{ supplier['email'] }}</div>{% endif %}
+    {% else %}
+      <div class="box-line"><strong>{{ pi['supplier_name'] or '' }}</strong></div>
+    {% endif %}
+  </div>
+  <div class="box">
+    <div class="box-title">Bill To</div>
+    <div class="box-line"><strong>FLORA Textile BI</strong></div>
+    <div class="box-line">1st floor, opp Head Post office</div>
+    <div class="box-line">M G Road, Bijapur 586101</div>
+    <div class="box-line">Karnataka, India</div>
+    <div class="box-line">GSTIN: 29AUDPD7648G1ZG</div>
+  </div>
+</div>
+{% endblock %}
+
+{% block table_headers %}
+  <th class="col-sno">#</th>
+  <th class="col-item">Item</th>
+  <th class="col-num">Qty</th>
+  <th class="col-num">Rate (₹)</th>
+  <th class="col-num">Discount (₹)</th>
+  <th class="col-num">{% if 'gst_type' in pi.keys() and (pi['gst_type'] or '') == 'interstate' %}IGST %{% else %}GST %{% endif %}</th>
+  <th class="col-num">Line Total (₹)</th>
+{% endblock %}
+
+{% block table_rows %}
+  {% for li in lines %}
+  <tr>
+    <td class="right">{{ loop.index }}</td>
+    <td>{{ li['item_name'] }}</td>
+    <td class="right">{{ '%.2f'|format(li['qty'] or 0) }}</td>
+    <td class="right">{{ '%.2f'|format(li['rate'] or 0) }}</td>
+    <td class="right">{{ '%.2f'|format(li['discount'] or 0) }}</td>
+    <td class="right">{{ '%.2f'|format(li['gst_rate'] or 0) }}</td>
+    <td class="right">{{ '%.2f'|format(li['line_total'] or 0) }}</td>
+  </tr>
+  {% endfor %}
+{% endblock %}
+
+{% block summary_rows %}
+  <tr>
+    <td class="label">Sub Total</td>
+    <td class="amount">₹ {{ '%.2f'|format(pi['total'] or 0) }}</td>
+  </tr>
+  <tr>
+    <td class="label">CGST</td>
+    <td class="amount">₹ {{ '%.2f'|format(pi['cgst_total'] or 0) }}</td>
+  </tr>
+  <tr>
+    <td class="label">SGST</td>
+    <td class="amount">₹ {{ '%.2f'|format(pi['sgst_total'] or 0) }}</td>
+  </tr>
+  <tr>
+    <td class="label">IGST</td>
+    <td class="amount">₹ {{ '%.2f'|format(pi['igst_total'] or 0) }}</td>
+  </tr>
+  <tr class="grand">
+    <td class="label">Grand Total</td>
+    <td class="amount">₹ {{ '%.2f'|format(pi['grand_total'] or 0) }}</td>
+  </tr>
+{% endblock %}
+
+{% block notes %}
+  <div class="box-title">Notes</div>
+  <div>Thank you for your business.</div>
+{% endblock %}
+
+{% block signatures %}
+  <div class="sig">Received By</div>
+  <div class="sig right">Authorized Signatory</div>
+{% endblock %}

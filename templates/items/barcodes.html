@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Print Barcodes</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f4f4f4; margin:0; }
+    .container { max-width: 1100px; margin: 20px auto; background:#fff; padding:20px; border-radius:6px; box-shadow:0 1px 6px rgba(0,0,0,0.08); }
+    h1 { margin:0 0 16px; }
+    a.button, button { display:inline-block; padding:8px 12px; background:#333; color:#fff; text-decoration:none; border:none; border-radius:4px; cursor:pointer; }
+    table { width:100%; border-collapse: collapse; margin-top: 12px; }
+    th, td { padding: 8px; border-bottom:1px solid #eee; text-align:left; }
+    tr:hover { background:#fafafa; }
+    .topnav{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+    .nav a{margin-right:8px}
+    .actions { display:flex; gap:8px; align-items:center; margin-bottom:8px; }
+    .muted { color:#666; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="topnav">
+      <h1>Print Barcodes</h1>
+      <div class="nav">
+        <a href="/items" class="button">Back to Inventory</a>
+        <a href="/logout" class="button" style="background:#f44336">Logout</a>
+      </div>
+    </div>
+
+    {% with messages = get_flashed_messages() %}
+    {% if messages %}
+      <div>
+        {% for message in messages %}
+        <div style="padding:8px;background:#d4edda;color:#155724;border-radius:4px;margin-bottom:8px">{{ message }}</div>
+        {% endfor %}
+      </div>
+    {% endif %}
+    {% endwith %}
+
+    <form method="POST" action="/items/barcodes">
+      <div class="actions" style="flex-wrap:wrap">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <input id="q" type="text" placeholder="Search by SKU or Name" oninput="filterRows()" style="padding:7px 10px;width:260px;border:1px solid #ddd;border-radius:4px" />
+          <select id="brandFilter" onchange="filterRows()" style="padding:7px 10px;border:1px solid #ddd;border-radius:4px;min-width:160px">
+            <option value="">All Brands</option>
+          </select>
+          <select id="supplierFilter" onchange="filterRows()" style="padding:7px 10px;border:1px solid #ddd;border-radius:4px;min-width:180px">
+            <option value="">All Suppliers</option>
+          </select>
+          <button type="button" onclick="clearFilters()">Clear Filters</button>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button type="button" onclick="toggleAll(true)">Select All</button>
+          <button type="button" onclick="toggleAll(false)">Clear</button>
+          <button type="submit" style="background:#9C27B0">Generate A4 PNG(s)</button>
+        </div>
+      </div>
+      <div class="muted">A4 page at 300 DPI, 5 columns, auto rows per page. Multiple pages will be returned as a ZIP.</div>
+
+      <table id="itemsTable">
+        <thead>
+          <tr>
+            <th style="width:36px"></th>
+            <th>SKU</th>
+            <th>Name</th>
+            <th style="width:90px">Copies</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for i in items %}
+          <tr data-sku="{{ (i['sku'] or '')|e }}" data-name="{{ (i['name'] or '')|e }}" data-brand="{{ (i['brand'] or '')|e }}" data-supplier="{{ (i['supplier_name'] or '')|e }}">
+            <td><input type="checkbox" name="item_id" value="{{ i['id'] }}" /></td>
+            <td>{{ i['sku'] or '' }}</td>
+            <td>{{ i['name'] }}</td>
+            <td>
+              <input type="number" name="qty[{{ i['id'] }}]" value="1" min="1" max="500" style="width:70px" />
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="4">No items found.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </form>
+  </div>
+
+  <script>
+    function toggleAll(state){
+      document.querySelectorAll('tbody tr:visible input[type=checkbox][name="item_id"]').forEach(cb=>cb.checked=state);
+      // Fallback for browsers without :visible support in querySelectorAll
+      document.querySelectorAll('tbody tr').forEach(tr=>{
+        const isShown = tr.style.display !== 'none';
+        if (isShown) {
+          const cb = tr.querySelector('input[type=checkbox][name="item_id"]');
+          if (cb) cb.checked = state;
+        }
+      });
+    }
+
+    function normalize(s){ return (s || '').toString().toLowerCase(); }
+
+    function filterRows(){
+      const q = normalize(document.getElementById('q').value);
+      const brand = normalize(document.getElementById('brandFilter').value);
+      const supplier = normalize(document.getElementById('supplierFilter').value);
+
+      document.querySelectorAll('#itemsTable tbody tr').forEach(tr => {
+        const sku = normalize(tr.getAttribute('data-sku'));
+        const name = normalize(tr.getAttribute('data-name'));
+        const b = normalize(tr.getAttribute('data-brand'));
+        const s = normalize(tr.getAttribute('data-supplier'));
+
+        let ok = true;
+        if (q) ok = sku.includes(q) || name.includes(q);
+        if (ok && brand) ok = (b === brand);
+        if (ok && supplier) ok = (s === supplier);
+        tr.style.display = ok ? '' : 'none';
+      });
+    }
+
+    function clearFilters(){
+      document.getElementById('q').value = '';
+      document.getElementById('brandFilter').value = '';
+      document.getElementById('supplierFilter').value = '';
+      filterRows();
+    }
+
+    // Populate dropdowns from table rows
+    function populateFilters(){
+      const brands = new Set();
+      const suppliers = new Set();
+      document.querySelectorAll('#itemsTable tbody tr').forEach(tr => {
+        const b = tr.getAttribute('data-brand');
+        const s = tr.getAttribute('data-supplier');
+        if (b) brands.add(b);
+        if (s) suppliers.add(s);
+      });
+      const bf = document.getElementById('brandFilter');
+      const sf = document.getElementById('supplierFilter');
+      [...Array.from(brands).sort()].forEach(v => {
+        const opt = document.createElement('option'); opt.value = v; opt.textContent = v; bf.appendChild(opt);
+      });
+      [...Array.from(suppliers).sort()].forEach(v => {
+        const opt = document.createElement('option'); opt.value = v; opt.textContent = v; sf.appendChild(opt);
+      });
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      populateFilters();
+      filterRows();
+    });
+  </script>
+</body>
+</html>

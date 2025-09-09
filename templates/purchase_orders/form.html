@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% if po %}Edit Purchase Order{% else %}New Purchase Order{% endif %}</title>
+  <style>
+    body { font-family: Arial, sans-serif; background:#f8f9fa; margin:0; }
+    .container { max-width:1200px; margin:20px auto; background:#fff; padding:20px; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.1); }
+    h1 { margin:0 0 16px; color:#333; }
+    a.button, button { display:inline-block; padding:8px 14px; background:#333; color:#fff; border:none; border-radius:4px; cursor:pointer; text-decoration:none; }
+    a.button:hover, button:hover { background:#555; }
+    .row { margin-bottom:10px; display:flex; gap:10px; align-items:center; }
+    .row label { width:150px; text-align:right; color:#555; }
+    .row input, .row select, .row textarea { flex:1; padding:8px; border:1px solid #ddd; border-radius:4px; }
+    .table-container { overflow-x:auto; margin-top:10px; }
+    table { width:100%; border-collapse:collapse; min-width:800px; }
+    th, td { padding:8px 12px; border:1px solid #ddd; vertical-align:middle; }
+    th { background:#f1f1f1; font-weight:bold; }
+    td input { width:100%; padding:6px; border:1px solid #ddd; border-radius:3px; font-size:14px; box-sizing:border-box; }
+    td input[type="number"] { text-align:right; }
+    .line-total { font-weight:bold; }
+    .remove-btn { background:#dc3545; font-size:12px; }
+    .duplicate-btn { background:#17a2b8; font-size:12px; margin-left:4px; }
+    .search-box { position:relative; }
+    .search-results { position:absolute; top:100%; left:0; right:0; background:#fff; border:1px solid #ddd; max-height:240px; overflow-y:auto; display:none; z-index:1000; }
+    .search-results div { padding:8px; cursor:pointer; }
+    .search-results div:hover { background:#f1f1f1; }
+    .totals-section { margin-top:20px; display:flex; justify-content:flex-end; }
+    .totals-box { background:#f8f9fa; border:1px solid #ddd; border-radius:4px; padding:15px; min-width:300px; }
+    .total-row { display:flex; justify-content:space-between; margin-bottom:8px; }
+    .total-row:last-child { margin-bottom:0; font-size:16px; font-weight:bold; border-top:1px solid #ddd; padding-top:8px; }
+    .top-buttons { display:flex; gap:10px; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+    <h1>{% if po %}Edit Purchase Order{% else %}New Purchase Order{% endif %}</h1>
+    <div class="top-buttons">
+      <a href="javascript:history.back()" class="button" style="background:#6c757d;">← Back</a>
+      <a href="/dashboard" class="button" style="background:#007bff;">🏠 Dashboard</a>
+      {% if po %}
+        <a href="/purchase_order/{{ po.id }}/pdf" class="button" style="background:#17a2b8;">📄 PDF</a>
+        <a href="/purchase_order/{{ po.id }}/print" target="_blank" class="button" style="background:#28a745;">🖨️ Print</a>
+      {% endif %}
+    </div>
+  </div>
+
+  <form method="POST">
+    <!-- Supplier -->
+    <div class="row">
+      <label>Supplier</label>
+      <div class="search-box" style="flex:1;">
+        <input type="text" id="supplierSearch" placeholder="Search supplier..." value="{{ po.supplier_name if po else '' }}">
+        <input type="hidden" name="supplier_id" id="supplierId" value="{{ po.supplier_id if po else '' }}">
+        <div class="search-results" id="supplierResults"></div>
+      </div>
+    </div>
+
+     <div class="row">
+      <label>Date</label>
+      <input type="date" name="date" value="{{ po.date if so else date_today }}">
+    </div>
+    <div class="row">
+      <label>PO No</label>
+      <input type="text" name="po_no" value="{{ po.po_no if po else '' }}" placeholder="Auto-generated if empty">
+    </div>
+    <div class="row">
+      <label>Notes</label>
+      <textarea name="notes">{{ po.notes if po else '' }}</textarea>
+    </div>
+
+    <!-- Line Items -->
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th>Qty</th>
+            <th>Rate (₹)</th>
+            <th>Discount (%)</th>
+            <th>GST %</th>
+            <th>Line Total (₹)</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="lines"></tbody>
+      </table>
+    </div>
+    <div style="margin-top:12px;">
+      <button type="button" onclick="addRow()">+ Add Line Item</button>
+    </div>
+
+    <!-- Totals -->
+    <div class="totals-section">
+      <div class="totals-box">
+        <div class="total-row"><span>Sub Total:</span><span>₹ <span id="total">0.00</span></span></div>
+        <div class="total-row"><span>Tax Total:</span><span>₹ <span id="tax_total">0.00</span></span></div>
+        <div class="total-row"><span>Grand Total:</span><span>₹ <span id="grand_total">0.00</span></span></div>
+      </div>
+    </div>
+
+    <div style="margin-top:20px;">
+      <button type="submit" style="background:#28a745;padding:12px 24px;font-size:16px;">💾 Save Purchase Order</button>
+    </div>
+  </form>
+</div>
+
+<script>
+/* Supplier Search */
+async function searchSuppliers(query) {
+  const baseUrl = `${window.location.protocol}//${window.location.hostname}:5010`;
+  const res = await fetch(`${baseUrl}/api/suppliers/search?q=${encodeURIComponent(query)}&limit=10`);
+  return await res.json();
+}
+
+document.getElementById('supplierSearch').addEventListener('input', async (e) => {
+  const q = e.target.value.trim();
+  const resultsBox = document.getElementById('supplierResults');
+  resultsBox.innerHTML = '';
+  if (q.length < 2) { resultsBox.style.display = 'none'; return; }
+  const data = await searchSuppliers(q);
+  if (!data || !data.results) return;
+  data.results.forEach(s => {
+    const div = document.createElement('div');
+    div.textContent = s.name;
+    div.onclick = () => {
+      document.getElementById('supplierId').value = s.id;
+      document.getElementById('supplierSearch').value = s.name;
+      resultsBox.style.display = 'none';
+    };
+    resultsBox.appendChild(div);
+  });
+  resultsBox.style.display = data.results.length ? 'block' : 'none';
+});
+
+/* Item Search (reused from SO) */
+async function searchItems(query) {
+  const baseUrl = `${window.location.protocol}//${window.location.hostname}:5010`;
+  const res = await fetch(`${baseUrl}/api/purchase-order/items/search"?q=${encodeURIComponent(query)}&limit=10`);
+  return await res.json();
+}
+
+function createItemSearch(row, pref={}) {
+  const div = document.createElement('div');
+  div.className = 'search-box';
+
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.placeholder = 'Search item by name or SKU...';
+  input.value = pref.item_name || '';
+
+  const hidden = document.createElement('input');
+  hidden.type = 'hidden';
+  hidden.name = 'item_id[]';
+  hidden.value = pref.item_id || '';
+
+  const results = document.createElement('div');
+  results.className = 'search-results';
+
+  div.appendChild(input);
+  div.appendChild(hidden);
+  div.appendChild(results);
+
+  input.addEventListener('input', async (e) => {
+    const q = e.target.value.trim();
+    results.innerHTML = '';
+    if (q.length < 2) { results.style.display = 'none'; return; }
+    const data = await searchItems(q);
+    (data.results||[]).forEach(it => {
+      const d = document.createElement('div');
+      d.textContent = `${it.name} [${it.sku}]`;
+      d.onclick = () => {
+        input.value = `${it.name} [${it.sku}]`;
+        hidden.value = it.id;
+        row.querySelector('[name="rate[]"]').value = it.purchase_price || 0;
+        row.querySelector('[name="gst[]"]').value = it.gst_rate || 18;
+        results.style.display = 'none';
+        calcTotals();
+      };
+      results.appendChild(d);
+    });
+    results.style.display = (data.results||[]).length ? 'block' : 'none';
+  });
+
+  return div;
+}
+
+/* Add Row */
+function addRow(pref={}) {
+  const tbody = document.getElementById('lines');
+  const tr = document.createElement('tr');
+
+  const tdItem = document.createElement('td');
+  tdItem.appendChild(createItemSearch(tr, pref)); tr.appendChild(tdItem);
+
+  tr.innerHTML += `
+    <td><input type="number" step="0.01" name="qty[]" value="${pref.qty||1}" required></td>
+    <td><input type="number" step="0.01" name="rate[]" value="${pref.rate||0}" required></td>
+    <td><input type="number" step="0.01" name="discount[]" value="${pref.discount||0}"></td>
+    <td><input type="number" step="0.01" name="gst[]" value="${pref.gst||18}"></td>
+    <td><span class="line-total">0.00</span></td>
+    <td>
+      <button type="button" class="remove-btn">Remove</button>
+      <button type="button" class="duplicate-btn">Duplicate</button>
+    </td>
+  `;
+
+  tr.querySelector('.remove-btn').onclick = ()=>{ tr.remove(); calcTotals(); };
+  tr.querySelector('.duplicate-btn').onclick = ()=>{ addRow(pref); };
+
+  tbody.appendChild(tr);
+  calcTotals();
+}
+
+/* Totals */
+function toNumber(v){ v=String(v||'').replace(/,/g,'.'); return parseFloat(v)||0; }
+
+function calcTotals() {
+  let total=0, tax=0;
+  document.querySelectorAll('#lines tr').forEach(tr=>{
+    let qty=toNumber(tr.querySelector('[name="qty[]"]').value);
+    let rate=toNumber(tr.querySelector('[name="rate[]"]').value);
+    let disc=toNumber(tr.querySelector('[name="discount[]"]').value);
+    let gst=toNumber(tr.querySelector('[name="gst[]"]').value);
+
+    let base=qty*rate;
+    let discounted=base*(1-disc/100);
+    let lineTax=discounted*(gst/100);
+    let lineTotal=discounted+lineTax;
+
+    total+=discounted; tax+=lineTax;
+
+    tr.querySelector('.line-total').textContent=lineTotal.toFixed(2);
+  });
+  document.getElementById('total').textContent=total.toFixed(2);
+  document.getElementById('tax_total').textContent=tax.toFixed(2);
+  document.getElementById('grand_total').textContent=(total+tax).toFixed(2);
+}
+
+/* Init */
+window.addEventListener('DOMContentLoaded', ()=>{
+  if(document.querySelectorAll('#lines tr').length===0) addRow({});
+});
+</script>
+</body>
+</html>

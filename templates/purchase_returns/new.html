@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>New Purchase Return</title>
+  <style>
+    body{font-family:Arial;margin:0;background:#f4f4f4}
+    .container{max-width:1200px;margin:20px auto;background:#fff;padding:20px;border-radius:6px;box-shadow:0 1px 6px rgba(0,0,0,0.08)}
+    .row{display:flex;gap:10px;margin-bottom:10px;align-items:center}
+    .row label{width:180px;text-align:right;color:#555}
+    .row input,.row select,.row textarea{flex:1;padding:8px;border:1px solid #ddd;border-radius:4px}
+    a.button,button{display:inline-block;padding:8px 12px;background:#333;color:#fff;text-decoration:none;border:none;border-radius:4px;cursor:pointer}
+    a.button:hover,button:hover{background:#555}
+    table{width:100%;border-collapse:collapse;min-width:800px}
+    th,td{border:1px solid #eee;padding:8px 10px;text-align:left;vertical-align:middle}
+    th{background:#f8f9fa}
+    .col-total{text-align:right}
+    .totals{display:flex;justify-content:flex-end;margin-top:12px}
+    .totals .box{background:#f8f9fa;border:1px solid #ddd;border-radius:4px;padding:12px;min-width:300px}
+    .total-row{display:flex;justify-content:space-between;margin-bottom:6px}
+  </style>
+</head>
+<body>
+<div class="container">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+    <h1>New Purchase Return</h1>
+    <div>
+      <a href="javascript:history.back()" class="button" style="background:#6c757d">← Back</a>
+      <a href="/dashboard" class="button" style="background:#007bff">🏠 Dashboard</a>
+    </div>
+  </div>
+
+  <form method="POST">
+    <div class="row">
+      <label>Supplier</label>
+      <select name="supplier_id" required>
+        <option value="">Select Supplier</option>
+        {% for s in suppliers %}
+          <option value="{{ s['id'] }}">{{ s['name'] }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="row">
+      <label>Return No</label>
+      <input type="text" name="return_no" placeholder="Auto if blank"/>
+    </div>
+    <div class="row">
+      <label>Return Date</label>
+      <input type="date" name="return_date" value="{{ date_today }}"/>
+    </div>
+    <div class="row">
+      <label>Linked Purchase Invoice</label>
+      <input type="number" name="linked_pi_id" value="{{ linked_pi_id or '' }}" placeholder="Enter PI ID (optional)"/>
+    </div>
+    <div class="row">
+      <label>Notes</label>
+      <textarea name="notes" placeholder="Reference, remarks..."></textarea>
+    </div>
+
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th>Qty</th>
+            <th>Rate (₹)</th>
+            <th>Discount (₹)</th>
+            <th>GST %</th>
+            <th class="col-total">Line Total (₹)</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="lines"></tbody>
+      </table>
+    </div>
+
+    <div style="margin-top:10px">
+      <button type="button" onclick="addRow()">+ Add Line</button>
+    </div>
+
+    <div class="totals">
+      <div class="box">
+        <div class="total-row"><span>Sub Total</span><strong>₹ <span id="total">0.00</span></strong></div>
+        <div class="total-row"><span>Tax Total</span><strong>₹ <span id="tax_total">0.00</span></strong></div>
+        <div class="total-row" style="border-top:1px solid #ddd;margin-top:6px;padding-top:6px"><span>Grand Total</span><strong>₹ <span id="grand_total">0.00</span></strong></div>
+      </div>
+    </div>
+
+    <div style="margin-top:16px">
+      <button type="submit" style="background:#28a745;padding:10px 18px;font-size:16px">Submit Return</button>
+    </div>
+  </form>
+</div>
+
+<script>
+  const items = {{ items|tojson }};
+  const prefillLines = {{ prefill_lines|tojson }};
+
+  function addRow(line) {
+    const tbody = document.getElementById('lines');
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>
+        <select name="item_id[]" required>
+          <option value="">Select Item</option>
+          ${items.map(i => `<option value="${i.id}">${i.name}</option>`).join('')}
+        </select>
+      </td>
+      <td><input type="number" step="0.01" name="qty[]" value="${line? (line.qty || 0): ''}" oninput="calcTotals()" required/></td>
+      <td><input type="number" step="0.01" name="rate[]" value="${line? (line.rate || 0): ''}" oninput="calcTotals()" required/></td>
+      <td><input type="number" step="0.01" name="discount[]" value="${line? (line.discount || 0): ''}" oninput="calcTotals()"/></td>
+      <td><input type="number" step="0.01" name="gst_rate[]" value="${line? (line.gst_rate || 0): (items.find(i=>i.id===(line?line.item_id:null))?.gst_rate || 0)}" oninput="calcTotals()"/></td>
+      <td class="col-total"><span class="line-total">0.00</span></td>
+      <td><button type="button" onclick="this.closest('tr').remove(); calcTotals();">✕</button></td>
+    `;
+    tbody.appendChild(tr);
+    if (line && line.item_id) tr.querySelector('select').value = line.item_id;
+    calcTotals();
+  }
+
+  function calcTotals(){
+    let total = 0, tax = 0;
+    document.querySelectorAll('#lines tr').forEach(tr => {
+      const qty = parseFloat(tr.querySelector('[name="qty[]"]').value || 0);
+      const rate = parseFloat(tr.querySelector('[name="rate[]"]').value || 0);
+      const disc = parseFloat(tr.querySelector('[name="discount[]"]').value || 0);
+      const gst = parseFloat(tr.querySelector('[name="gst_rate[]"]').value || 0);
+      const sub = Math.max(qty*rate - disc, 0);
+      const gstAmt = Math.round(sub * (gst/100) * 100) / 100;
+      const lineTotal = Math.round((sub + gstAmt) * 100) / 100;
+      total += sub; tax += gstAmt;
+      tr.querySelector('.line-total').textContent = lineTotal.toFixed(2);
+    });
+    document.getElementById('total').textContent = total.toFixed(2);
+    document.getElementById('tax_total').textContent = tax.toFixed(2);
+    document.getElementById('grand_total').textContent = (total+tax).toFixed(2);
+  }
+
+  // Prefill from PI items if provided
+  if (Array.isArray(prefillLines)) {
+    prefillLines.forEach(l => addRow({item_id: l.item_id, qty: l.qty, rate: l.rate, discount: l.discount, gst_rate: l.gst_rate}));
+  }
+</script>
+</body>
+</html>

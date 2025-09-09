@@ -1,0 +1,84 @@
+{% extends 'print/_base_document.html' %}
+{% block title %}Purchase Order #{{ po['id'] }}{% endblock %}
+{% block doc_title %}PURCHASE ORDER{% endblock %}
+{% block doc_meta_rows %}{% endblock %}
+  
+
+
+{% block parties %}
+<div class="cols">
+  <div class="box">
+    <div class="box-title">Supplier</div>
+    {% if supplier %}
+      <div class="box-line"><strong>{{ supplier['name'] }}</strong></div>
+      {% if supplier['gstin'] %}<div class="box-line">GSTIN: {{ supplier['gstin'] }}</div>{% endif %}
+      {% if supplier['address'] %}<div class="box-line">{{ supplier['address'] }}</div>{% endif %}
+      {% if supplier['city'] or supplier['state'] or supplier['pincode'] %}
+        <div class="box-line">{{ supplier['city'] or '' }} {{ supplier['pincode'] or '' }} {{ supplier['state'] or '' }}</div>
+      {% endif %}
+      {% if supplier['phone'] %}<div class="box-line">Phone: {{ supplier['phone'] }}</div>{% endif %}
+      {% if supplier['email'] %}<div class="box-line">Email: {{ supplier['email'] }}</div>{% endif %}
+    {% else %}
+      <div class="box-line"><strong>{{ po['supplier_name'] or '' }}</strong></div>
+    {% endif %}
+  </div>
+  <div class="box">
+    <div class="box-line"><strong>PO No:</strong> {{ po['po_no'] or '-' }}</div>
+    <div class="box-line"><small>PO ID:</strong> {{ po['id'] }}</div>
+    <div class="box-line"><strong>Current PO Date:</strong> {{ po['date'] or '-' }}</div>
+    <div class="box-line">Place of Supply: Bijapur 586101,Karnataka, India</div>
+    <div class="box-line">Transporter Name: </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block table_headers %}
+  <th class="col-sno">#</th>
+  <th class="col-item">Item</th>
+  <th class="col-num">HSN</th>
+  <th class="col-num">Qty</th>
+  <th class="col-num">Rate (₹)</th>
+  <th class="col-num">Discount (%)</th>
+  <th class="col-num">GST %</th>
+  <th class="col-num">Line Total (₹)</th>
+{% endblock %}
+
+{% block table_rows %}
+  {% for li in lines %}
+  <tr>
+    <td class="right">{{ loop.index }}</td>
+    <td>{{ li['item_name'] }}</td>
+    <td class="right">{{ li['hsn_code'] or '' }}</td>
+    <td class="right">{{ '%.2f'|format(li['qty'] or 0) }}</td>
+    <td class="right">{{ '%.2f'|format(li['rate'] or 0) }}</td>
+    <td class="right">{{ '%.2f'|format(li['discount'] or 0) }}</td>
+    <td class="right">{{ '%.2f'|format(li['gst_rate'] or 0) }}</td>
+    <td class="right">{{ '%.2f'|format(li['line_total'] or 0) }}</td>
+  </tr>
+  {% endfor %}
+{% endblock %}
+
+{% block summary_rows %}
+  <tr>
+    <td class="label">Sub Total</td>
+    <td class="amount">₹ {{ '%.2f'|format(po['total'] or 0) }}</td>
+  </tr>
+  <tr>
+    <td class="label">GST Tax Total</td>
+    <td class="amount">₹ {{ '%.2f'|format(po['tax_total'] or 0) }}</td>
+  </tr>
+  <tr class="grand">
+    <td class="label">Grand Total</td>
+    <td class="amount">₹ {{ '%.2f'|format(po['grand_total'] or 0) }}</td>
+  </tr>
+{% endblock %}
+<div class="box-line"><strong>Amount in Words:</strong> ₹ {{ tot.total|inr_words|capitalize }}</div>
+{% block notes %}
+  <div class="box-title">Notes / Terms</div>
+  <div>Please deliver materials as per PO terms. Any discrepancies should be reported within 2 business days.</div>
+{% endblock %}
+
+{% block signatures %}
+  <div class="sig">Supplier Acknowledgement</div>
+  <div class="sig right">Authorized Signatory</div>
+{% endblock %}

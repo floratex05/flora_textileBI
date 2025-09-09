@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Add Payment — Invoice #{{ si['id'] }}</title>
+  <style>
+    body { font-family: Arial, sans-serif; background:#f4f4f4; margin:0 }
+    .container { max-width: 520px; margin: 30px auto; background:#fff; padding:20px; border-radius:10px; box-shadow:0 8px 32px rgba(0,0,0,0.12); }
+    h1 { margin:0 0 12px; font-size: 18px; }
+    .muted { color:#666; font-size: 13px; }
+    label { display:block; font-size:12px; margin-bottom:4px; color:#333 }
+    input, select, textarea { width:100%; padding:10px; border:1px solid #ddd; border-radius:6px; box-sizing: border-box; }
+    .row { display:grid; grid-template-columns: 1fr 1fr; gap:12px }
+    .actions { display:flex; gap:8px; margin-top:12px }
+    .button { padding:8px 12px; border:none; border-radius:6px; background:#333; color:#fff; text-decoration:none; cursor:pointer }
+    a.button.secondary { background:#777 }
+    .summary { display:flex; gap:16px; background:#fafafa; border:1px solid #eee; padding:10px; border-radius:6px; margin-bottom:12px }
+    .summary strong { display:block; font-size:14px }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Add Payment — Invoice #{{ si['id'] }} {{ si['si_no'] and '(' ~ si['si_no'] ~ ')' or '' }}</h1>
+    <div class="muted">Customer: {{ si['customer_name'] }} • Date: {{ si['date'] or '-' }}</div>
+
+    <div class="summary">
+      <div><strong>Total</strong> ₹ {{ '%.2f'|format(si['grand_total'] or 0) }}</div>
+      <div><strong>Paid</strong> ₹ {{ '%.2f'|format(paid_total or 0) }}</div>
+      <div><strong>Remaining Balance</strong> ₹ {{ '%.2f'|format(balance or 0) }}</div>
+    </div>
+
+    <form method="POST" action="/sales-invoices/{{ si['id'] }}/payments">
+      <div class="row">
+        <div>
+          <label>Date</label>
+          <input type="date" name="date" value="{{ (si['date'] or '').split('T')[0] or '' }}" required />
+        </div>
+        <div>
+          <label>Mode</label>
+          <select name="mode">
+            {% for m in ['Cash','Card','UPI','Bank Transfer','Cheque','Other'] %}
+              <option value="{{ m }}">{{ m }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="row">
+        <div>
+          <label>Reference</label>
+          <input type="text" name="reference" placeholder="Txn/Ref" />
+        </div>
+        <div>
+          <label>Amount</label>
+          <input type="number" step="0.01" name="amount" min="0" max="{{ balance|default(0) }}" required />
+        </div>
+      </div>
+      <div>
+        <label>Notes</label>
+        <input type="text" name="notes" />
+      </div>
+      <div class="actions">
+        <button type="submit" class="button" style="background:#4CAF50">Save Payment</button>
+        <a href="/sales-invoices/{{ si['id'] }}" class="button secondary">Cancel</a>
+      </div>
+    </form>
+  </div>
+</body>
+</html>

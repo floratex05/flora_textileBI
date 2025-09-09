@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{ 'Edit' if supplier else 'New' }} Supplier</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f4f4f4; margin:0; }
+    .container { max-width: 720px; margin: 20px auto; background:#fff; padding:20px; border-radius:6px; box-shadow:0 1px 6px rgba(0,0,0,0.08); }
+    h1 { margin:0 0 16px; }
+    .grid { display:grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    label { display:block; font-size: 12px; color:#333; margin-bottom:4px; }
+    input, textarea, select { width:100%; padding:8px; border:1px solid #ddd; border-radius:4px; box-sizing:border-box; }
+    .actions { margin-top: 16px; display:flex; gap:8px; }
+    .button { padding:8px 12px; border:none; border-radius:4px; background:#333; color:#fff; text-decoration:none; cursor:pointer; }
+    a.button.secondary { background:#777; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>{{ 'Edit' if supplier else 'New' }} Supplier</h1>
+
+    {% with messages = get_flashed_messages() %}
+    {% if messages %}
+    <div>
+      {% for message in messages %}
+      <div style="padding:8px;background:#d4edda;color:#155724;border-radius:4px;margin-bottom:8px">{{ message }}</div>
+      {% endfor %}
+    </div>
+    {% endif %}
+    {% endwith %}
+
+    <form method="POST">
+      <div class="grid">
+        <div>
+          <label>Name</label>
+          <input type="text" required name="name" value="{{ supplier['name'] if supplier else '' }}" />
+        </div>
+        <div>
+          <label>Email</label>
+          <input type="email" name="email" value="{{ supplier['email'] if supplier else '' }}" />
+        </div>
+        <div>
+          <label>Phone</label>
+          <input type="text" name="phone" value="{{ supplier['phone'] if supplier else '' }}" />
+        </div>
+        <div>
+          <label>GSTIN</label>
+          <input type="text" name="gstin" value="{{ supplier['gstin'] if supplier else '' }}" />
+        </div>
+        <div>
+          <label>GST Type</label>
+          {% set gst_type = (supplier['gst_type'] if supplier and 'gst_type' in supplier.keys() else 'regular') %}
+          <select name="gst_type">
+            <option value="regular" {{ 'selected' if gst_type == 'regular' else '' }}>Regular</option>
+            <option value="composition" {{ 'selected' if gst_type == 'composition' else '' }}>Composition</option>
+            <option value="no_gst" {{ 'selected' if gst_type == 'no_gst' else '' }}>No GST</option>
+          </select>
+        </div>
+        <div>
+          <label>Address</label>
+          <input type="text" name="address" value="{{ supplier['address'] if supplier else '' }}" />
+        </div>
+        <div>
+          <label>City</label>
+          <input type="text" name="city" value="{{ supplier['city'] if supplier and 'city' in supplier.keys() else '' }}" />
+        </div>
+        <div>
+          <label>Pincode</label>
+          <input type="text" name="pincode" value="{{ supplier['pincode'] if supplier and 'pincode' in supplier.keys() else '' }}" />
+        </div>
+        <div>
+          <label>State</label>
+          <input type="text" name="state" value="{{ supplier['state'] if supplier and 'state' in supplier.keys() else '' }}" />
+        </div>
+        <div>
+          <label>Contact Person</label>
+          <input type="text" name="contact_person" value="{{ supplier['contact_person'] if supplier and 'contact_person' in supplier.keys() else '' }}" />
+        </div>
+        <div>
+          <label>Mobile</label>
+          <input type="text" name="mobile" value="{{ supplier['mobile'] if supplier and 'mobile' in supplier.keys() else '' }}" />
+        </div>
+        <div>
+          <label>Status</label>
+          <select name="status">
+            {% set st = (supplier['status'] if supplier else 'active') %}
+            <option value="active" {{ 'selected' if st == 'active' else '' }}>Active</option>
+            <option value="inactive" {{ 'selected' if st == 'inactive' else '' }}>Inactive</option>
+          </select>
+        </div>
+      </div>
+      <div class="actions">
+        <button type="submit" class="button">{{ 'Update' if supplier else 'Create' }}</button>
+        <a href="/suppliers" class="button secondary">Cancel</a>
+      </div>
+    </form>
+  </div>
+</body>
+</html>

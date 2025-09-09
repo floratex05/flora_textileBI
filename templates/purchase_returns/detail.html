@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Purchase Return #{{ pr['id'] }}</title>
+  <style>
+    body{font-family:Arial;margin:0;background:#f6f7fb}
+    .container{max-width:1100px;margin:20px auto;background:#fff;padding:20px;border-radius:6px;box-shadow:0 1px 6px rgba(0,0,0,0.08)}
+    table{width:100%;border-collapse:collapse}
+    th,td{border:1px solid #eee;padding:8px 10px;text-align:left}
+    th{background:#f3f4f6}
+    .right{text-align:right}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:12px 0}
+    .box{border:1px solid #eee;border-radius:6px;padding:10px}
+    .muted{color:#666}
+    a.button{display:inline-block;padding:6px 10px;background:#333;color:white;text-decoration:none;border-radius:4px}
+  </style>
+</head>
+<body>
+<div class="container">
+  <div style="display:flex;justify-content:space-between;align-items:center">
+    <h1>Purchase Return #{{ pr['id'] }}</h1>
+    <div>
+      <a class="button" href="/purchase-returns">Back</a>
+      <a class="button" href="/purchase-returns/{{ pr['id'] }}/edit" style="background:#6c757d">Edit</a>
+      <a class="button" href="/print/purchase-return/{{ pr['id'] }}" target="_blank">Print</a>
+      <a class="button" href="/pdf/purchase-return/{{ pr['id'] }}">PDF</a>
+      <a class="button" href="/print/purchase-return/packing-slip/{{ pr['id'] }}" target="_blank" style="background:#444">Packing Slip</a>
+      <a class="button" href="/pdf/purchase-return/packing-slip/{{ pr['id'] }}" style="background:#607D8B">Packing Slip PDF</a>
+      <a class="button" href="/print/purchase-return/delivery-note/{{ pr['id'] }}" target="_blank" style="background:#444">Delivery Note</a>
+      <a class="button" href="/pdf/purchase-return/delivery-note/{{ pr['id'] }}" style="background:#607D8B">Delivery Note PDF</a>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="box">
+      <div><strong>Return No:</strong> {{ pr['return_no'] or ('PR#' ~ pr['id']) }}</div>
+      <div><strong>Date:</strong> {{ pr['return_date'] or '-' }}</div>
+      <div><strong>Supplier:</strong> {{ pr['supplier_name'] }}</div>
+      {% if pr['notes'] %}<div class="muted">{{ pr['notes'] }}</div>{% endif %}
+    </div>
+    <div class="box">
+      <div><strong>Totals</strong></div>
+      <div>Sub Total: ₹ {{ '%.2f'|format(pr['total'] or 0) }}</div>
+      <div>Tax Total: ₹ {{ '%.2f'|format(pr['tax_total'] or 0) }}</div>
+      <div><strong>Grand Total: ₹ {{ '%.2f'|format(pr['grand_total'] or 0) }}</strong></div>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Item</th>
+        <th class="right">Qty</th>
+        <th class="right">Rate (₹)</th>
+        <th class="right">Discount (₹)</th>
+        <th class="right">GST %</th>
+        <th class="right">Line Total (₹)</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for li in lines %}
+      <tr>
+        <td class="right">{{ loop.index }}</td>
+        <td>{{ li['item_name'] }}</td>
+        <td class="right">{{ '%.2f'|format(li['qty'] or 0) }}</td>
+        <td class="right">{{ '%.2f'|format(li['rate'] or 0) }}</td>
+        <td class="right">{{ '%.2f'|format(li['discount'] or 0) }}</td>
+        <td class="right">{{ '%.2f'|format(li['gst_rate'] or 0) }}</td>
+        <td class="right">{{ '%.2f'|format(li['line_total'] or 0) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+</body>
+</html>

@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sales Invoices</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f4f4f4; margin:0; }
+    .container { max-width: 1200px; margin: 20px auto; background:#fff; padding:20px; border-radius:6px; box-shadow:0 1px 6px rgba(0,0,0,0.08); }
+    h1 { margin:0 0 16px; }
+    table { width:100%; border-collapse: collapse; }
+    th, td { padding: 8px; border-bottom:1px solid #eee; text-align:left; }
+    a.button { display:inline-block; padding:8px 12px; background:#333; color:#fff; text-decoration:none; border-radius:4px; }
+    .filters{ display:flex; gap:10px; margin-bottom:10px }
+    .topnav{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+    .nav a{margin-right:8px}
+
+    /* Dropdown styles */
+    .dropdown { position: relative; display: inline-block; }
+    .dropdown > .button { background:#333; }
+    .dropdown-menu { display:none; position:absolute; right:0; top:100%; background:#fff; min-width:180px; border:1px solid #ddd; border-radius:6px; box-shadow:0 4px 12px rgba(0,0,0,0.1); z-index:10; padding:4px 0; }
+    .dropdown.open .dropdown-menu { display:block; }
+    .dropdown-menu a, .dropdown-menu button { display:block; width:100%; text-align:left; padding:8px 12px; background:none; border:none; color:#333; text-decoration:none; cursor:pointer; }
+    .dropdown-menu a:hover, .dropdown-menu button:hover { background:#f5f5f5; }
+    .dropdown-menu form { margin:0; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="topnav">
+      <h1>Sales Invoices</h1>
+      <div class="nav">
+        <a href="/" class="button" style="background:#4CAF50">Dashboard</a>
+        <div class="dropdown" data-dropdown>
+          <a class="button" href="#" data-dropdown-toggle>Import/Export ▾</a>
+          <div class="dropdown-menu">
+            <a href="/sales-invoices/export.csv{% if request.query_string %}?{{ request.query_string.decode('utf-8') }}{% endif %}">Export CSV</a>
+          </div>
+        </div>
+        <a href="/sales-invoices/new" class="button">+ New Invoice</a>
+        <a href="/logout" class="button" style="background:#f44336">Logout</a>
+      </div>
+    </div>
+
+    <form method="GET" class="filters">
+      <input type="text" name="q" placeholder="Search invoice no / customer" value="{{ q or '' }}"/>
+      <select name="customer_id" onchange="this.form.submit()">
+        <option value="">All customers</option>
+        {% for c in customers %}
+          <option value="{{ c['id'] }}" {{ 'selected' if (customer_id|int if customer_id else None) == c['id'] else '' }}>{{ c['name'] }}</option>
+        {% endfor %}
+      </select>
+      <select name="per_page" onchange="this.form.submit()">
+        {% for n in [20,50,100] %}
+          <option value="{{ n }}" {{ 'selected' if per_page==n else '' }}>{{ n }} / page</option>
+        {% endfor %}
+      </select>
+      <button type="submit" class="button">Filter</button>
+      <a class="button" href="/sales-invoices/export.csv{% if request.query_string %}?{{ request.query_string.decode('utf-8') }}{% endif %}">Export CSV</a>
+    </form>
+
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Customer</th>
+          <th>Invoice No</th>
+          <th>Date</th>
+          <th>Total (INR)</th>
+          <th>Grand Total (INR)</th>
+          <th>Paid (INR)</th>
+          <th>Balance (INR)</th>
+          <th style="width:200px">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+        <tr>
+          <td>{{ r['id'] }}</td>
+          <td>{{ r['customer_name'] }}</td>
+          <td>{{ r['si_no'] or '' }}</td>
+          <td>{{ r['date'] or '' }}</td>
+          <td>{{ '%.2f'|format(r['total'] or 0) }}</td>
+          <td>{{ '%.2f'|format(r['grand_total'] or 0) }}</td>
+          <td>{{ '%.2f'|format(r['paid_total'] or 0) }}</td>
+          {% set balance = (r['grand_total'] or 0) - (r['paid_total'] or 0) %}
+          <td>{{ '%.2f'|format(balance) }}</td>
+          <td>
+            <div class="dropdown" data-dropdown>
+              <a class="button" href="#" data-dropdown-toggle>Actions ▾</a>
+              <div class="dropdown-menu">
+                <a href="/sales-invoices/{{ r['id'] }}">View</a>
+                {% if (r['status'] or 'draft') == 'draft' %}
+                  <a href="/sales-invoices/{{ r['id'] }}/edit">Edit</a>
+                  <form method="POST" action="/sales-invoices/{{ r['id'] }}/confirm" onsubmit="return confirm('Confirm this invoice and apply stock OUT?');">
+                    <button type="submit">Confirm</button>
+                  </form>
+                  <form method="POST" action="/sales-invoices/{{ r['id'] }}/cancel" onsubmit="return confirm('Cancel this draft invoice?');">
+                    <button type="submit">Cancel</button>
+                  </form>
+                {% elif (r['status'] or '') == 'confirmed' %}
+                  <form method="POST" action="/sales-invoices/{{ r['id'] }}/cancel" onsubmit="return confirm('Cancel this confirmed invoice? This will restore stock.');">
+                    <button type="submit">Cancel</button>
+                  </form>
+                {% endif %}
+                {% if (r['status'] or '') == 'confirmed' %}
+                  <a href="/sales-invoices/{{ r['id'] }}/payments/new">+ Add Payment</a>
+                {% endif %}
+                <a href="/print/sales-invoice/{{ r['id'] }}">Print</a>
+                <a href="/pdf/sales-invoice/{{ r['id'] }}">PDF</a>
+                <form method="POST" action="/sales-invoices/{{ r['id'] }}/delete" onsubmit="return confirm('Delete this invoice? This will restore stock if confirmed.');">
+                  <button type="submit">Delete</button>
+                </form>
+              </div>
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7">No Sales Invoices found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <div class="pagination" style="margin-top:12px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+      <a class="button" href="{{ url_for('sinv_list', q=q, customer_id=customer_id, per_page=per_page, page=page-1) }}" {% if page<=1 %}style="pointer-events:none;opacity:.5"{% endif %}>Prev</a>
+      {% for p in range(1, (pages or 1)+1) %}
+        <a class="button {% if p==page %}active{% endif %}" href="{{ url_for('sinv_list', q=q, customer_id=customer_id, per_page=per_page, page=p) }}">{{ p }}</a>
+      {% endfor %}
+      <a class="button" href="{{ url_for('sinv_list', q=q, customer_id=customer_id, per_page=per_page, page=page+1) }}" {% if page>=pages %}style="pointer-events:none;opacity:.5"{% endif %}>Next</a>
+      <span class="muted">Page {{ page }} of {{ pages }} • {{ total }} invoices</span>
+    </div>
+  </div>
+  <script>
+    // Toggle dropdown on click and close when clicking outside
+    document.addEventListener('click', function (e) {
+      const isToggle = e.target.matches('[data-dropdown-toggle]');
+      const dropdown = e.target.closest('[data-dropdown]');
+
+      // Close all dropdowns if clicking outside
+      document.querySelectorAll('.dropdown.open').forEach(d => {
+        if (!d.contains(e.target)) d.classList.remove('open');
+      });
+
+      if (isToggle && dropdown) {
+        e.preventDefault();
+        dropdown.classList.toggle('open');
+      }
+    });
+  </script>
+</body>
+</html>

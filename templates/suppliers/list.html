@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Suppliers</title>
+  <style>
+    body { font-family: Arial, sans-serif; background:#f4f4f4; margin:0; }
+    .container { max-width: 960px; margin:20px auto; background:#fff; padding:20px; border-radius:6px; box-shadow:0 1px 6px rgba(0,0,0,0.08); }
+    h1 { margin:0 0 12px; font-size:20px; }
+
+    /* Buttons */
+    a.button, button.button {
+      display:inline-block; padding:6px 12px; font-size:14px;
+      background:#333; color:#fff; text-decoration:none; border:none;
+      border-radius:4px; cursor:pointer;
+    }
+    a.button:hover, button.button:hover { background:#555; }
+
+    /* Topnav */
+    .topnav{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+    .nav a{margin-right:6px}
+
+    /* Actions bar */
+    .actions{margin-bottom:10px;display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+
+    /* Table */
+    table { width:100%; border-collapse:collapse; }
+    th, td { padding:8px; border-bottom:1px solid #eee; text-align:left; }
+    tr:hover { background:#fafafa; }
+    .row-actions form { display:inline; }
+    .row-actions button { background:#f44336; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer; font-size:12px; }
+
+    /* Dropdown */
+    .dropdown{position:relative;display:inline-block}
+    .dropdown > .button{background:#333}
+    .dropdown-menu{position:absolute;right:0;top:100%;background:#fff;border:1px solid #ddd;border-radius:6px;min-width:200px;box-shadow:0 4px 12px rgba(0,0,0,0.12);padding:6px 0;display:none;z-index:10}
+    .dropdown-menu a, .dropdown-menu button{display:block;width:100%;text-align:left;background:none;border:none;padding:8px 12px;color:#333;text-decoration:none;cursor:pointer}
+    .dropdown-menu a:hover, .dropdown-menu button:hover{background:#f5f5f5}
+    .dropdown-menu hr{border:none;border-top:1px solid #eee;margin:6px 0}
+
+    .pagination button{padding:6px 10px;border:1px solid #ddd;background:#fff;border-radius:4px;cursor:pointer}
+    .pagination button.active{background:#333;color:#fff;border-color:#333}
+    .pagination .muted{color:#666}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="topnav">
+      <h1>Suppliers</h1>
+      <div class="nav">
+        <a href="/" class="button" style="background:#4CAF50">Dashboard</a>
+        <a href="/items" class="button">Inventory</a>
+        <a href="/purchase-orders" class="button">Purchase Orders</a>
+        <a href="/logout" class="button" style="background:#f44336">Logout</a>
+      </div>
+    </div>
+
+    <div class="actions">
+      <a href="/suppliers/new" class="button" style="background:#2e7d32">+ New Supplier</a>
+      <div class="dropdown">
+        <button type="button" class="button" onclick="toggleDD('suppExportDD')">Import / Export ▾</button>
+        <div id="suppExportDD" class="dropdown-menu">
+          <div style="padding:6px 12px;color:#666;font-size:13px">Export</div>
+          <a href="/suppliers/export.csv">Export CSV</a>
+          <a href="/suppliers/export.xlsx">Export XLSX</a>
+          <hr/>
+          <div style="padding:6px 12px;color:#666;font-size:13px">Import Templates</div>
+          <a href="/suppliers/import-template.csv">CSV Template</a>
+          <a href="/suppliers/import-template.xlsx">XLSX Template</a>
+          <hr/>
+          <div style="padding:6px 12px;color:#666;font-size:13px">Import</div>
+          <form method="POST" action="/suppliers/import" enctype="multipart/form-data" style="padding:6px 12px">
+            <input type="file" name="file" accept=".csv,.xlsx,.xls" required style="display:block;margin-bottom:8px">
+            <button type="submit" class="button" style="background:#2196F3">Upload</button>
+          </form>
+        </div>
+      </div>
+
+      <!-- Search + filters -->
+      <form method="GET" action="/suppliers" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <input name="q" value="{{ q or '' }}" type="text" placeholder="Search name/email/phone/gstin/city" style="padding:7px 10px;width:260px;border:1px solid #ddd;border-radius:4px" />
+        <select name="status" style="padding:7px 10px;border:1px solid #ddd;border-radius:4px;min-width:140px" onchange="this.form.submit()">
+          <option value="" {{ 'selected' if not status else '' }}>All Status</option>
+          <option value="active" {{ 'selected' if status=='active' else '' }}>Active</option>
+          <option value="inactive" {{ 'selected' if status=='inactive' else '' }}>Inactive</option>
+        </select>
+        <select name="per_page" style="padding:7px 10px;border:1px solid #ddd;border-radius:4px;min-width:120px" onchange="this.form.submit()">
+          {% for n in [20,50,100] %}
+          <option value="{{ n }}" {{ 'selected' if per_page==n else '' }}>{{ n }} / page</option>
+          {% endfor %}
+        </select>
+        <button type="submit" class="button" style="background:#2196F3">Search</button>
+        <a class="button" href="/suppliers" style="background:#6c757d">Clear</a>
+      </form>
+    </div>
+
+    {% with messages = get_flashed_messages() %}
+    {% if messages %}
+    <div>
+      {% for message in messages %}
+      <div style="padding:8px;background:#d4edda;color:#155724;border-radius:4px;margin-bottom:8px">{{ message }}</div>
+      {% endfor %}
+    </div>
+    {% endif %}
+    {% endwith %}
+
+    <table id="suppliersTable">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Email</th>
+          <th>Phone</th>
+          <th>GSTIN</th>
+          <th>City</th>
+          <th>State</th>
+          <th>Status</th>
+          <th style="width:160px">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in suppliers %}
+        <tr data-name="{{ (s['name'] or '')|e }}" data-email="{{ (s['email'] or '')|e }}" data-city="{{ (s['city'] or '')|e }}" data-status="{{ (s['status'] or '')|e }}">
+          <td>{{ s['name'] }}</td>
+          <td>{{ s['email'] or '' }}</td>
+          <td>{{ s['phone'] or '' }}</td>
+          <td>{{ s['gstin'] or '' }}</td>
+          <td>{{ s['city'] or '' }}</td>
+          <td>{{ s['state'] or '' }}</td>
+          <td>{{ s['status'] or '' }}</td>
+          <td class="row-actions">
+            <div class="dropdown">
+              <button type="button" class="button" onclick="toggleRowDD(this)">Actions ▾</button>
+              <div class="dropdown-menu">
+                <a href="/suppliers/{{ s['id'] }}/edit">Edit</a>
+                <a href="/reports/supplier-ledger/{{ s['id'] }}">Ledger</a>
+                <a href="/pdf/supplier-ledger/{{ s['id'] }}">PDF Ledger</a>
+                <hr/>
+                <form method="POST" action="/suppliers/{{ s['id'] }}/delete" onsubmit="return confirm('Delete this supplier?')">
+                  <button type="submit" style="color:#c62828">Delete</button>
+                </form>
+              </div>
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="8">No suppliers found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <div class="pagination" style="margin-top:12px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+      <a class="button" href="{{ url_for('supplier_list', q=q, status=status, per_page=per_page, page=page-1) }}" {% if page<=1 %}style="pointer-events:none;opacity:.5"{% endif %}>Prev</a>
+      {% for p in range(1, (pages or 1)+1) %}
+        <a class="button {% if p==page %}active{% endif %}" href="{{ url_for('supplier_list', q=q, status=status, per_page=per_page, page=p) }}">{{ p }}</a>
+      {% endfor %}
+      <a class="button" href="{{ url_for('supplier_list', q=q, status=status, per_page=per_page, page=page+1) }}" {% if page>=pages %}style="pointer-events:none;opacity:.5"{% endif %}>Next</a>
+      <span class="muted">Page {{ page }} of {{ pages }} • {{ total }} suppliers</span>
+    </div>
+  </div>
+
+  <script>
+    function toggleDD(id){
+      const dd = document.getElementById(id);
+      const isOpen = dd.style.display === 'block';
+      document.querySelectorAll('.dropdown-menu').forEach(m => m.style.display='none');
+      dd.style.display = isOpen ? 'none' : 'block';
+    }
+    function toggleRowDD(btn){
+      const menu = btn.parentElement.querySelector('.dropdown-menu');
+      const open = menu.style.display === 'block';
+      document.querySelectorAll('#suppliersTable .dropdown .dropdown-menu').forEach(m => m.style.display='none');
+      menu.style.display = open ? 'none' : 'block';
+    }
+    document.addEventListener('click', (e) => {
+      const inside = e.target.closest('.dropdown');
+      if (!inside) document.querySelectorAll('.dropdown-menu').forEach(m => m.style.display='none');
+    });
+  </script>
+</body>
+</html>
