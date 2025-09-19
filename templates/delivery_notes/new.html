@@ -36,7 +36,7 @@
         <select name="si_id" id="siSelect">
           <option value="">None</option>
           {% for si in sales_invoices %}
-            <option value="{{ si['id'] }}">{{ si['si_no'] or ('SI-' + (si['id']|string)) }} — {{ si['customer_name'] }}</option>
+            <option value="{{ si['id'] }}">{{ si['invoice_no'] or ('SI-' + (si['id']|string)) }} — {{ si['customer_name'] }}</option>
           {% endfor %}
         </select>
       </div>

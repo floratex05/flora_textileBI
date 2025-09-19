@@ -55,14 +55,17 @@
 
     <form method="POST">
       <div class="row">
-        <label>Customer</label>
-        <select name="customer_id" required id="customerSelect">
-          <option value="">Select Customer</option>
-        </select>
+      <label>Customer</label>
+      <div class="search-box" style="flex:1;">
+        <input type="text" id="customerSearch" placeholder="Search customer..." value="{{ so.customer_name if so else '' }}">
+        <input type="hidden" name="customer_id" id="customerId" value="{{ so.customer_id if so else '' }}">
+        <div class="search-results" id="customerResults"></div>
       </div>
+    </div>
+
       <div class="row">
         <label>Invoice No</label>
-        <input type="text" name="si_no" placeholder="Auto-generated if empty"/>
+        <input type="text" name="invoice_no" placeholder="Auto-generated if empty"/>
       </div>
       <div class="row">
         <label>Invoice Date</label>
@@ -113,32 +116,37 @@
   </div>
 
   <script>
+
+/* Customer Search */
+async function searchCustomers(query, page=1) {
+  const baseUrl = `${window.location.protocol}//${window.location.hostname}:5010`;
+  const res = await fetch(`${baseUrl}/api/customers/search?q=${encodeURIComponent(query)}&page=${page}&limit=10`);
+  return await res.json();
+}
+
+document.getElementById('customerSearch').addEventListener('input', async (e) => {
+  const q = e.target.value.trim();
+  const resultsBox = document.getElementById('customerResults');
+  resultsBox.innerHTML = '';
+  if (q.length < 2) { resultsBox.style.display = 'none'; return; }
+  const data = await searchCustomers(q);
+  if (!data || !data.results) return;
+  data.results.forEach(c => {
+    const div = document.createElement('div');
+    div.textContent = `${c.name}${c.email ? ' ('+c.email+')' : ''}`;
+    div.onclick = () => {
+      document.getElementById('customerId').value = c.id;
+      document.getElementById('customerSearch').value = c.name;
+      resultsBox.style.display = 'none';
+    };
+    resultsBox.appendChild(div);
+  });
+  resultsBox.style.display = data.results.length ? 'block' : 'none';
+});
+
+
     window.items = [];
-    window.customers = [];
-
-    async function loadInitialData() {
-      try {
-        const customersResponse = await fetch('/api/customers');
-        if (customersResponse.ok) {
-          window.customers = await customersResponse.json();
-          populateCustomerDropdown();
-        }
-        const itemsResponse = await fetch('/api/items/search?limit=50');
-        if (itemsResponse.ok) {
-          window.items = await itemsResponse.json();
-        }
-      } catch (error) { console.error('Error loading initial data:', error); }
-    }
-
-    function populateCustomerDropdown() {
-      const select = document.getElementById('customerSelect');
-      select.innerHTML = '<option value="">Select Customer</option>';
-      window.customers.forEach(c => {
-        const opt = document.createElement('option');
-        opt.value = c.id; opt.textContent = c.name; select.appendChild(opt);
-      });
-    }
-
+    
     async function searchItems(query) {
       try {
         const url = query && query.trim() ? `/api/items/search?q=${encodeURIComponent(query)}&limit=20` : `/api/items/search?limit=20`;

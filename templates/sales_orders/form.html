@@ -140,7 +140,7 @@ document.getElementById('customerSearch').addEventListener('input', async (e) =>
 /* Item Search */
 async function searchItems(query, page=1) {
   const baseUrl = `${window.location.protocol}//${window.location.hostname}:5010`;
-  const res = await fetch(`${baseUrl}/api/items/search?q=${encodeURIComponent(query)}&page=${page}&limit=10`);
+  const res = await fetch(`${baseUrl}/api/items/search/sales?q=${encodeURIComponent(query)}&page=${page}&limit=10`);
   return await res.json();
 }
 

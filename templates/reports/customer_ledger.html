@@ -40,7 +40,7 @@
         <select id="si_id" name="si_id" onchange="if (this.value) { window.location.href = '/sales-invoices/' + this.value + '/payments/new'; }">
           <option value="">Select outstanding invoice…</option>
           {% for inv in outstanding_invoices %}
-            <option value="{{ inv['id'] }}">{{ inv['si_no'] or ('SI#' ~ inv['id']) }} — ₹ {{ '%.2f'|format(inv['balance'] or 0) }}</option>
+            <option value="{{ inv['id'] }}">{{ inv['invoice_no'] or ('SI#' ~ inv['id']) }} — ₹ {{ '%.2f'|format(inv['balance'] or 0) }}</option>
           {% endfor %}
         </select>
         <a class="button" href="/sales-invoices/{{ outstanding_invoices[0]['id'] }}/payments/new" onclick="const sel=document.getElementById('si_id'); if (sel && sel.value) { this.href='/sales-invoices/'+sel.value+'/payments/new'; } else { alert('Select an invoice'); return false; }">+ Add Payment</a>

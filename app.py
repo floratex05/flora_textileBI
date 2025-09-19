@@ -381,7 +381,6 @@ def init_db():
             item_id INTEGER NOT NULL,
             qty REAL NOT NULL,
             rate REAL NOT NULL,
-            discount REAL DEFAULT 0,
             gst_rate REAL DEFAULT 0,
             line_total REAL DEFAULT 0,
             FOREIGN KEY(purchase_id) REFERENCES purchases(id),
@@ -460,7 +459,8 @@ def init_db():
         """
         CREATE TABLE IF NOT EXISTS sales_invoices (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            si_no TEXT UNIQUE,
+            invoice_no TEXT UNIQUE,
+            sales_order_id INTEGER, -- new column to link to sales_orders
             customer_id INTEGER NOT NULL,
             date TEXT,
             notes TEXT,
@@ -1684,9 +1684,31 @@ def salesorder_list():
     )
 
 
+# For sales orders (no GST, discount allowed)
+def calculate_line_sales(qty, rate, discount):
+    qty = float(qty or 0)
+    rate = float(rate or 0)
+    discount = float(discount or 0)
+
+    base = qty * rate
+    net = base - discount
+    return qty, rate, discount, net
+
+
+
+# --- Helper for Sales Orders (no GST, only discount) ---
+def calculate_line_sales(qty, rate, discount):
+    qty = float(qty or 0)
+    rate = float(rate or 0)
+    discount = float(discount or 0)
+
+    base = qty * rate
+    net = base - discount
+    return qty, rate, discount, net
+
 
 # --- New Sales Order ---
-@app.route("/sales-orders/new", methods=["GET", "POST"], endpoint="salesorder_new")
+@app.route("/sales-orders/new", methods=["GET", "POST"])
 @login_required
 def salesorder_new():
     db = get_db()
@@ -1702,42 +1724,36 @@ def salesorder_new():
 
         total = 0.0
 
-        # 1. Insert SO placeholder (so_no blank for now)
+        # 1. Insert SO placeholder
         cur = db.execute("""
             INSERT INTO sales_orders (customer_id, so_no, date, expected_delivery_date, notes, total, grand_total)
             VALUES (?, '', ?, ?, ?, 0, 0)
         """, (customer_id, date, expected_delivery_date, notes))
         so_id = cur.lastrowid
 
-         # 2. Generate SO number with daily reset
+        # 2. Generate SO number with daily reset
         today_str = datetime.now().strftime("%Y%m%d")
-
-        # Count how many SOs already exist for today
-        count_today = db.execute("""
-            SELECT COUNT(*) 
-            FROM sales_orders 
-            WHERE so_no LIKE ?
-        """, (f"SO{today_str}-%",)).fetchone()[0]
-
+        count_today = db.execute(
+            "SELECT COUNT(*) FROM sales_orders WHERE so_no LIKE ?",
+            (f"SO{today_str}-%",)
+        ).fetchone()[0]
         next_seq = count_today + 1
         so_no = f"SO{today_str}-{next_seq:05d}"
 
-        # 3. Update order with generated SO number
         db.execute("UPDATE sales_orders SET so_no=? WHERE id=?", (so_no, so_id))
 
-        
-        # 4. Insert items
+        # 3. Insert line items
         for i in range(len(item_ids)):
             if not item_ids[i]:
                 continue
-            qty, rate, disc, line_total = calculate_line(qtys[i], rates[i], discounts[i])
+            qty, rate, disc, line_total = calculate_line_sales(qtys[i], rates[i], discounts[i])
             total += line_total
             db.execute("""
                 INSERT INTO sales_order_items (sales_order_id, item_id, qty, rate, discount, line_total)
                 VALUES (?, ?, ?, ?, ?, ?)
             """, (so_id, item_ids[i], qty, rate, disc, line_total))
 
-        # 5. Update totals
+        # 4. Update totals
         db.execute("UPDATE sales_orders SET total=?, grand_total=? WHERE id=?", (total, total, so_id))
         db.commit()
 
@@ -1754,6 +1770,7 @@ def salesorder_new():
         selected_customer=None,
         date_today=datetime.today().strftime("%Y-%m-%d"),
     )
+
 
 # --- Edit Sales Order ---
 @app.route("/sales-orders/<int:so_id>/edit", methods=["GET", "POST"])
@@ -1776,28 +1793,33 @@ def salesorder_edit(so_id):
         discounts = request.form.getlist("discount[]")
         item_ids = request.form.getlist("item_id[]")
 
+        # Delete old lines
         db.execute("DELETE FROM sales_order_items WHERE sales_order_id=?", (so_id,))
 
         total = 0.0
         for i in range(len(item_ids)):
             if not item_ids[i]:
                 continue
-            qty, rate, disc, line_total = calculate_line(qtys[i], rates[i], discounts[i])
+            qty, rate, disc, line_total = calculate_line_sales(qtys[i], rates[i], discounts[i])
             total += line_total
             db.execute("""
                 INSERT INTO sales_order_items (sales_order_id, item_id, qty, rate, discount, line_total)
                 VALUES (?, ?, ?, ?, ?, ?)
             """, (so_id, item_ids[i], qty, rate, disc, line_total))
 
+        # Update SO
         db.execute("""
             UPDATE sales_orders
-            SET customer_id=?, so_no=?, date=?, expected_delivery_date=?, notes=?, total=?, grand_total=?, updated_at=CURRENT_TIMESTAMP
+            SET customer_id=?, so_no=?, date=?, expected_delivery_date=?, notes=?, 
+                total=?, grand_total=?, updated_at=CURRENT_TIMESTAMP
             WHERE id=?
         """, (customer_id, so_no, date, expected_delivery_date, notes, total, total, so_id))
         db.commit()
+
         flash("Sales Order updated successfully!", "success")
         return redirect(url_for("salesorder_list"))
 
+    # GET → load form with existing lines
     lines = db.execute("""
         SELECT l.id, l.item_id, l.qty, l.rate, l.discount, l.line_total,
                i.name as item_name, i.sku as item_sku
@@ -1868,8 +1890,7 @@ def salesorder_print(id):
 
     return render_template("print/sales_order.html", so=so, lines=lines)
 
-
-# --- PDF Export ---
+# --- PDF Export Sales Order (view, Download)---
 @app.route("/sales-orders/<int:id>/pdf", methods=["GET"], endpoint="salesorder_pdf")
 @login_required
 def salesorder_pdf(id):
@@ -1879,86 +1900,186 @@ def salesorder_pdf(id):
         flash("Sales Order not found.", "danger")
         return redirect(url_for("salesorder_list"))
 
-    html = render_template("print/sales_order.html", so=so, lines=lines)
-
-    pdf_file = BytesIO()
-    HTML(string=html, base_url=request.root_path).write_pdf(pdf_file)
-    pdf_file.seek(0)
-
-    return send_file(
-        pdf_file,
-        as_attachment=True,
-        download_name=f"SalesOrder_{id}.pdf",
-        mimetype="application/pdf"
+    # Render HTML template
+    rendered_html = render_template(
+        "print/sales_order.html",
+        so=so,
+        lines=lines
     )
 
+    # Generate filename (use SO number if available, else fallback to ID)
+    filename = f"SalesOrder_{so['so_no'] if so['so_no'] else id}.pdf"
 
+    # Decide mode: inline view or download
+    download = request.args.get("download", "0") == "1"
 
+    disposition = "attachment" if download else "inline"
+
+    # Return inline PDF
+    return Response(
+        HTML(string=rendered_html, base_url=request.host_url).write_pdf(),
+        mimetype="application/pdf",
+        headers={
+            "Content-Disposition": f'{disposition}; filename="{filename}"'
+        }
+    )
 
 # ----------------------
-# Sales Invoices CRUD + Convert from SO to SI (with Pagination)
+# Sales Invoices CRUD + Convert from Sales Order
 # ----------------------
+# ----------helpers----------
+
+def save_invoice(db, form):
+    """Insert a new invoice and its items into the database."""
+    customer_id = form.get("customer_id")
+    invoice_date = form.get("invoice_date")
+    due_date = form.get("due_date")
+    notes = form.get("notes")
+
+    # 1. Insert into sales_invoices
+    cursor = db.execute(
+        """
+        INSERT INTO sales_invoices (customer_id, date, due_date, notes)
+        VALUES (?, ?, ?, ?)
+        """,
+        (customer_id, invoice_date, due_date, notes),
+    )
+    invoice_id = cursor.lastrowid
+
+    # 2. Insert items (loop through dynamic form fields)
+    items = form.getlist("item_id")
+    qtys = form.getlist("qty")
+    rates = form.getlist("rate")
+    discounts = form.getlist("discount")
+
+    for i, item_id in enumerate(items):
+        if not item_id:
+            continue
+        qty = float(qtys[i] or 0)
+        rate = float(rates[i] or 0)
+        disc = float(discounts[i] or 0)
+        line_total = qty * rate - disc
+
+        db.execute(
+            """
+            INSERT INTO sales_invoice_items (invoice_id, item_id, qty, rate, discount, line_total)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (invoice_id, item_id, qty, rate, disc, line_total),
+        )
+
+    db.commit()
+    return redirect(url_for("salesinvoices_list"))
+
+# -----Get Sales Invoice with Lines ----------
+
 @app.route('/sales-invoices')
 @login_required
 def salesinvoice_list():
     db = get_db()
+
+    # Pagination
     page = int(request.args.get("page", 1))
-    per_page = 20
+    per_page = int(request.args.get("per_page", 20))
     offset = (page - 1) * per_page
 
-    total = db.execute("SELECT COUNT(*) as count FROM sales_invoices").fetchone()["count"]
+    # Optional filters
+    q = request.args.get("q", "").strip()
+    customer_id = request.args.get("customer_id")
 
-    sql = """
+    # Build query dynamically
+    base_query = """
         SELECT si.*, c.name as customer_name, so.so_no
         FROM sales_invoices si
         JOIN customers c ON si.customer_id = c.id
         LEFT JOIN sales_orders so ON si.sales_order_id = so.id
-        ORDER BY si.date DESC, si.id DESC
-        LIMIT ? OFFSET ?
+        WHERE 1=1
     """
-    invoices = db.execute(sql, (per_page, offset)).fetchall()
-    total_pages = (total + per_page - 1) // per_page
+    params = []
 
-    return render_template("sales_invoices/list.html",
-                           invoices=invoices,
-                           page=page,
-                           total_pages=total_pages)
+    if q:
+        base_query += " AND (si.invoice_no LIKE ? OR c.name LIKE ?)"
+        params.extend([f"%{q}%", f"%{q}%"])   # ✅ fixed
 
-@app.route('/sales-invoices/new', methods=['GET', 'POST'])
-@login_required
-def salesinvoice_new():
-    db = get_db()
-    customers = db.execute("SELECT id, name FROM customers ORDER BY name").fetchall()
-    items = db.execute("SELECT id, name, sku, selling_price, discount FROM items WHERE status='active' ORDER BY name").fetchall()
-    if request.method == 'POST':
-        return save_invoice(db, request.form)
-    return render_template('sales_invoices/form.html', invoice=None, lines=[], customers=customers, items=items,
-                           date_today=datetime.today().strftime("%Y-%m-%d"))
+    if customer_id:
+        base_query += " AND si.customer_id = ?"
+        params.append(customer_id)
 
-@app.route('/sales-invoices/from-so/<int:so_id>')
+    # Count total
+    total_sql = f"SELECT COUNT(*) as count FROM ({base_query})"
+    total = db.execute(total_sql, params).fetchone()["count"]
+
+    # Apply order + pagination
+    sql = base_query + " ORDER BY si.date DESC, si.id DESC LIMIT ? OFFSET ?"
+    invoices = db.execute(sql, (*params, per_page, offset)).fetchall()
+
+
+
+    pages = (total + per_page - 1) // per_page
+
+    
+    return render_template(
+        "sales_invoices/list.html",
+        invoices=invoices,
+        page=page,
+        pages=pages,
+        per_page=per_page,
+        q=q,
+        customer_id=customer_id,
+        total=total
+    )
+
+
+# ---- Convert Sales Order → Invoice ----
+@app.route('/sales-invoices/from-so/<int:so_id>', methods=['GET', 'POST'])
 @login_required
 def salesinvoice_from_so(so_id):
     db = get_db()
+
+    # 1. Fetch Sales Order
     so = db.execute("SELECT * FROM sales_orders WHERE id=?", (so_id,)).fetchone()
-    lines = db.execute("SELECT * FROM sales_order_items WHERE sales_order_id=?", (so_id,)).fetchall()
+    if not so:
+        flash("Sales Order not found", "error")
+        return redirect(url_for('salesorder_list'))
+
+    # 2. Fetch Sales Order Items
+    so_lines = db.execute("""
+        SELECT soi.*, i.name, i.sku, i.selling_price 
+        FROM sales_order_items soi
+        JOIN items i ON soi.item_id = i.id
+        WHERE soi.sales_order_id = ?
+    """, (so_id,)).fetchall()
+
+    # 3. Customers + Items for dropdowns
     customers = db.execute("SELECT id, name FROM customers ORDER BY name").fetchall()
     items = db.execute("SELECT id, name, sku, selling_price, discount FROM items WHERE status='active' ORDER BY name").fetchall()
+
+    if request.method == 'POST':
+        # Save invoice and link back to SO
+        return save_invoice(db, request.form, sales_order_id=so_id)
+
     return render_template("sales_invoices/form.html",
                            invoice=None,
-                           lines=lines,
+                           lines=so_lines,
                            customers=customers,
                            items=items,
                            so=so,
+                           from_so=True,
                            date_today=datetime.today().strftime("%Y-%m-%d"))
 
-def save_invoice(db, form, id=None):
+
+
+# ---- Save Invoice (new + edit) ----
+def save_invoice(db, form, id=None, sales_order_id=None):
     customer_id = form.get('customer_id')
     date = form.get('date')
     due_date = form.get('due_date')
-    invoice_no = form.get('invoice_no') or f"INV{int(datetime.now().timestamp())}"
+    invoice_no = form.get('invoice_no') or f"INV{int(datetime.now().timestamp())}"  # use invoice_noconsistently
     notes = form.get('notes')
-    so_id = form.get('sales_order_id')
 
+    so_id = sales_order_id or form.get('sales_order_id')
+
+    # Collect line items
     item_ids = form.getlist('item_id[]')
     qtys = form.getlist('qty[]')
     rates = form.getlist('rate[]')
@@ -1975,24 +2096,31 @@ def save_invoice(db, form, id=None):
         total += line_total
         line_items.append((item_ids[i], qty, rate, disc, line_total))
 
+    grand_total = total  # extend later with taxes, freight, etc.
+
     if id is None:
         cursor = db.execute("""
-            INSERT INTO sales_invoices (invoice_no, sales_order_id, customer_id, date, due_date, notes, total, grand_total)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, (invoice_no, so_id, customer_id, date, due_date, notes, total, total))
+            INSERT INTO sales_invoices (invoice_no, sales_order_id, customer_id, date, notes, total, grand_total)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (invoice_no, so_id, customer_id, date, notes, total, grand_total))
         invoice_id = cursor.lastrowid
+
+        # Update SO status → "invoiced"
+        if so_id:
+            db.execute("UPDATE sales_orders SET status='invoiced' WHERE id=?", (so_id,))
     else:
         db.execute("""
             UPDATE sales_invoices
-            SET sales_order_id=?, customer_id=?, date=?, due_date=?, invoice_no=?, notes=?, total=?, grand_total=?, updated_at=CURRENT_TIMESTAMP
+            SET sales_order_id=?, customer_id=?, date=?, invoice_no=?, notes=?, total=?, grand_total=?, updated_at=CURRENT_TIMESTAMP
             WHERE id=?
-        """, (so_id, customer_id, date, due_date, invoice_no, notes, total, total, id))
-        db.execute("DELETE FROM sales_invoice_items WHERE sales_invoice_id=?", (id,))
+        """, (so_id, customer_id, date, invoice_no, notes, total, grand_total, id))
+        db.execute("DELETE FROM sales_invoice_items WHERE invoice_id=?", (id,))
         invoice_id = id
 
+    # Insert line items
     for item_id, qty, rate, disc, line_total in line_items:
         db.execute("""
-            INSERT INTO sales_invoice_items (sales_invoice_id, item_id, qty, rate, discount, line_total)
+            INSERT INTO sales_invoice_items (invoice_id, item_id, qty, rate, discount, line_total)
             VALUES (?, ?, ?, ?, ?, ?)
         """, (invoice_id, item_id, qty, rate, disc, line_total))
 
@@ -2000,62 +2128,159 @@ def save_invoice(db, form, id=None):
     flash("Sales Invoice saved successfully!", "success")
     return redirect(url_for('salesinvoice_list'))
 
+
+# ---- New Invoice ----
+@app.route('/sales-invoices/new', methods=['GET', 'POST'])
+@login_required
+def salesinvoice_new():
+    db = get_db()
+    customers = db.execute("SELECT id, name FROM customers ORDER BY name").fetchall()
+    items = db.execute("SELECT id, name, sku, selling_price, discount FROM items WHERE status='active' ORDER BY name").fetchall()
+
+    if request.method == 'POST':
+        return save_invoice(db, request.form)
+
+    return render_template("sales_invoices/form.html",
+                           invoice=None,
+                           lines=[],
+                           customers=customers,
+                           items=items,
+                           date_today=datetime.today().strftime("%Y-%m-%d"))
+
+
+# ---- Edit Invoice ----
 @app.route('/sales-invoices/<int:id>/edit', methods=['GET', 'POST'])
 @login_required
 def salesinvoice_edit(id):
     db = get_db()
     invoice = db.execute("SELECT * FROM sales_invoices WHERE id=?", (id,)).fetchone()
-    lines = db.execute("SELECT * FROM sales_invoice_items WHERE sales_invoice_id=?", (id,)).fetchall()
+    lines = db.execute("SELECT * FROM sales_invoice_items WHERE invoice_id=?", (id,)).fetchall()
     customers = db.execute("SELECT id, name FROM customers ORDER BY name").fetchall()
     items = db.execute("SELECT id, name, sku, selling_price, discount FROM items WHERE status='active' ORDER BY name").fetchall()
+
     if request.method == 'POST':
         return save_invoice(db, request.form, id=id)
-    return render_template('sales_invoices/form.html', invoice=invoice, lines=lines, customers=customers, items=items,
+
+    return render_template("sales_invoices/form.html",
+                           invoice=invoice,
+                           lines=lines,
+                           customers=customers,
+                           items=items,
                            date_today=datetime.today().strftime("%Y-%m-%d"))
 
+
+# ---- Delete Invoice ----
 @app.route('/sales-invoices/<int:id>/delete', methods=['POST'])
 @login_required
 def salesinvoice_delete(id):
     db = get_db()
-    db.execute("DELETE FROM sales_invoice_items WHERE sales_invoice_id=?", (id,))
+    db.execute("DELETE FROM sales_invoice_items WHERE invoice_id=?", (id,))
     db.execute("DELETE FROM sales_invoices WHERE id=?", (id,))
     db.commit()
     flash("Invoice deleted.", "success")
     return redirect(url_for('salesinvoice_list'))
 
-
-# --- API Routes for Items (autocomplete / search)
-@app.route("/api/items/search")
+@app.route("/sales-orders/<int:id>/transition/<state>", methods=["POST"])
 @login_required
-def search_items():
+def salesorder_transition(id, state):
+    allowed = {
+        "Draft": ["Confirmed"],
+        "Confirmed": ["In Production"],
+        "In Production": ["Completed"]
+    }
+    order = get_db().execute("SELECT status FROM sales_orders WHERE id=?", (id,)).fetchone()
+    if not order:
+        abort(404)
+
+    if state not in allowed.get(order["status"], []):
+        flash("Invalid transition!", "error")
+        return redirect(url_for("salesorder_view", id=id))
+
+    transition_state(get_db(), "sales_orders", id, state)
+    flash(f"Sales Order moved to {state}", "success")
+    return redirect(url_for("salesorder_view", id=id))
+
+
+
+
+# --- Print Sales Invoice (HTML preview) ---
+@app.route("/sales-invoices/<int:id>/print", methods=["GET"], endpoint="salesinvoice_print")
+@login_required
+def salesinvoice_print(id):
+    so, lines = get_salesinvoice_with_lines(id)
+
+    if not so:
+        flash("Sales Invoice not found.", "danger")
+        return redirect(url_for("salesinvoice_list"))
+
+    return render_template("print/sales_invoice.html", so=so, lines=lines)
+    
+        
+    # --- PDF Export Sales Invoice ---
+@app.route("/sales-invoices/<int:id>/pdf", methods=["GET"], endpoint="salesinvoice_pdf")
+@login_required
+def salesinvoice_pdf(id):
+    so, lines = get_salesinvoice_with_lines(id)
+
+    if not so:
+        flash("Sales Invoice not found.", "danger")
+        return redirect(url_for("salesinvoice_list"))
+
+    # Render HTML template
+    rendered_html = render_template(
+        "print/sales_invoice.html",
+        so=so,
+        lines=lines
+    )
+
+    # Generate filename (use SO number if available, else fallback to ID)
+    filename = f"SalesOrder_{so['so_no'] if so['so_no'] else id}.pdf"
+
+    # Decide mode: inline view or download
+    download = request.args.get("download", "0") == "1"
+
+    disposition = "attachment" if download else "inline"
+
+    # Return inline PDF
+    return Response(
+        HTML(string=rendered_html, base_url=request.host_url).write_pdf(),
+        mimetype="application/pdf",
+        headers={
+            "Content-Disposition": f'{disposition}; filename="{filename}"'
+        }
+    )
+
+
+
+
+# --- API Route: Sales Item Search ---
+@app.route("/api/items/search/sales")
+@login_required
+def search_items_sales():
     q = request.args.get("q", "").strip()
     limit = int(request.args.get("limit", 10))
     page = int(request.args.get("page", 1))
     offset = (page - 1) * limit
-    context = request.args.get("context", "")
 
     db = get_db()
-    rows = db.execute(
-        """
+    rows = db.execute("""
         SELECT
             id,
             name,
             sku,
-            IFNULL(selling_price, 0) AS selling_price,
-            IFNULL(discount, 0) AS discount,
-            IFNULL(stock_qty, 0) AS stock_qty,
-            IFNULL(uom, 'Nos') AS uom
+            COALESCE(selling_price, 0) AS selling_price,
+            COALESCE(discount, 0) AS discount,
+            COALESCE(stock_qty, 0) AS stock_qty,
+            COALESCE(uom, 'Nos') AS uom
         FROM items
         WHERE name LIKE ? COLLATE NOCASE
            OR sku LIKE ? COLLATE NOCASE
         ORDER BY name
         LIMIT ? OFFSET ?
-        """,
-        (f"%{q}%", f"%{q}%", limit, offset)
-    ).fetchall()
+    """, (f"%{q}%", f"%{q}%", limit, offset)).fetchall()
 
-    return jsonify({"results": [dict(r) for r in rows]})
-
+    results = [dict(r) for r in rows]
+    return jsonify({"results": results})
 
 
 
@@ -2204,12 +2429,25 @@ def po_list():
         pagination=pagination
     )
 
+# --- Helper for Purchase Orders ---
+def calculate_line_purchase(qty, rate, gst):
+    """Calculate net, tax, and total for a purchase order line item."""
+    qty = float(qty or 0)
+    rate = float(rate or 0)
+    gst = float(gst or 0)
 
-# --- New ---
-@app.route("/purchase-orders/new", methods=["GET", "POST"], endpoint="po_new")
+    net = qty * rate
+    tax = net * gst / 100
+    line_total = net + tax
+    return qty, rate, gst, net, tax, line_total
+
+
+# --- New Purchase Order ---
+@app.route("/purchase-orders/new", methods=["GET", "POST"])
 @login_required
 def po_new():
     db = get_db()
+
     if request.method == "POST":
         supplier_id = request.form.get("supplier_id")
         date = request.form.get("date") or datetime.today().strftime("%Y-%m-%d")
@@ -2218,7 +2456,6 @@ def po_new():
 
         qtys = request.form.getlist("qty[]")
         rates = request.form.getlist("rate[]")
-        discounts = request.form.getlist("discount[]")
         gst_rates = request.form.getlist("gst_rate[]")
         item_ids = request.form.getlist("item_id[]")
 
@@ -2231,7 +2468,7 @@ def po_new():
         """, (supplier_id, date, notes))
         po_id = cur.lastrowid
 
-        # Auto-generate PO number if empty
+        # Auto-generate PO number if not given
         if not po_no:
             today_str = datetime.now().strftime("%Y%m%d")
             count_today = db.execute(
@@ -2242,32 +2479,33 @@ def po_new():
 
         db.execute("UPDATE purchase_orders SET po_no=? WHERE id=?", (po_no, po_id))
 
-        # Insert line items
-        for i in range(len(item_ids)):
-            if not item_ids[i]:
+        # Insert line items safely using zip
+        for item_id, qty, rate, gst_rate in zip(item_ids, qtys, rates, gst_rates):
+            if not item_id:
                 continue
-            qty, rate, disc, gst, net, tax, line_total = calculate_line(
-                qtys[i], rates[i], discounts[i], gst_rates[i]
-            )
+            qty, rate, gst, net, tax, line_total = calculate_line_purchase(qty, rate, gst_rate)
             total += net
             tax_total += tax
             grand_total += line_total
             db.execute("""
                 INSERT INTO purchase_order_items 
-                (purchase_order_id, item_id, qty, rate, discount, gst_rate, net, tax, line_total)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (po_id, item_ids[i], qty, rate, disc, gst, net, tax, line_total))
+                (purchase_order_id, item_id, qty, rate, gst_rate, net, tax, line_total)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (po_id, item_id, qty, rate, gst, net, tax, line_total))
 
-        db.execute(
-            "UPDATE purchase_orders SET total=?, tax_total=?, grand_total=? WHERE id=?",
-            (total, tax_total, grand_total, po_id)
-        )
+        # Update totals
+        db.execute("""
+            UPDATE purchase_orders 
+            SET total=?, tax_total=?, grand_total=? 
+            WHERE id=?
+        """, (total, tax_total, grand_total, po_id))
         db.commit()
+
         flash(f"Purchase Order {po_no} created successfully!", "success")
         return redirect(url_for("po_list"))
 
+    # GET → render form
     suppliers = db.execute("SELECT id, name FROM suppliers ORDER BY name").fetchall()
-    
     return render_template(
         "purchase_orders/form.html",
         po=None,
@@ -2277,8 +2515,8 @@ def po_new():
     )
 
 
-# --- Edit ---
-@app.route("/purchase-orders/<int:po_id>/edit", methods=["GET", "POST"], endpoint="po_edit")
+# --- Edit Purchase Order ---
+@app.route("/purchase-orders/<int:po_id>/edit", methods=["GET", "POST"])
 @login_required
 def po_edit(po_id):
     db = get_db()
@@ -2295,28 +2533,27 @@ def po_edit(po_id):
 
         qtys = request.form.getlist("qty[]")
         rates = request.form.getlist("rate[]")
-        discounts = request.form.getlist("discount[]")
         gst_rates = request.form.getlist("gst_rate[]")
         item_ids = request.form.getlist("item_id[]")
 
+        # Delete old items
         db.execute("DELETE FROM purchase_order_items WHERE purchase_order_id=?", (po_id,))
 
         total, tax_total, grand_total = 0.0, 0.0, 0.0
-        for i in range(len(item_ids)):
-            if not item_ids[i]:
+        for item_id, qty, rate, gst_rate in zip(item_ids, qtys, rates, gst_rates):
+            if not item_id:
                 continue
-            qty, rate, disc, gst, net, tax, line_total = calculate_line(
-                qtys[i], rates[i], discounts[i], gst_rates[i]
-            )
+            qty, rate, gst, net, tax, line_total = calculate_line_purchase(qty, rate, gst_rate)
             total += net
             tax_total += tax
             grand_total += line_total
             db.execute("""
                 INSERT INTO purchase_order_items 
-                (purchase_order_id, item_id, qty, rate, discount, gst_rate, net, tax, line_total)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (po_id, item_ids[i], qty, rate, disc, gst, net, tax, line_total))
+                (purchase_order_id, item_id, qty, rate, gst_rate, net, tax, line_total)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (po_id, item_id, qty, rate, gst, net, tax, line_total))
 
+        # Update PO
         db.execute("""
             UPDATE purchase_orders
             SET supplier_id=?, po_no=?, date=?, notes=?, 
@@ -2324,15 +2561,18 @@ def po_edit(po_id):
             WHERE id=?
         """, (supplier_id, po_no, date, notes, total, tax_total, grand_total, po_id))
         db.commit()
+
         flash("Purchase Order updated successfully!", "success")
         return redirect(url_for("po_list"))
 
+    # GET → fetch existing items
     lines = db.execute("""
         SELECT l.*, i.name as item_name, i.sku as item_sku
         FROM purchase_order_items l
         JOIN items i ON l.item_id=i.id
         WHERE l.purchase_order_id=?
     """, (po_id,)).fetchall()
+
     suppliers = db.execute("SELECT id, name FROM suppliers ORDER BY name").fetchall()
 
     return render_template(
@@ -2411,6 +2651,38 @@ def po_pdf(id):
         mimetype="application/pdf"
     )
 
+
+# --- API Route: Purchase Item Search ---
+@app.route("/api/items/search/purchase")
+@login_required
+def search_items_purchase():
+    q = request.args.get("q", "").strip()
+    limit = int(request.args.get("limit", 10))
+    page = int(request.args.get("page", 1))
+    offset = (page - 1) * limit
+
+    db = get_db()
+    rows = db.execute("""
+        SELECT
+            id,
+            name,
+            sku,
+            COALESCE(cost_price, 0) AS cost_price,
+            COALESCE(gst_rate, 0) AS gst_rate,
+            COALESCE(stock_qty, 0) AS stock_qty,
+            COALESCE(uom, 'Nos') AS uom
+        FROM items
+        WHERE name LIKE ? COLLATE NOCASE
+           OR sku LIKE ? COLLATE NOCASE
+        ORDER BY name
+        LIMIT ? OFFSET ?
+    """, (f"%{q}%", f"%{q}%", limit, offset)).fetchall()
+
+    results = [dict(r) for r in rows]
+    return jsonify({"results": results})
+
+
+
 # --- API Routes for suppliers (autocomplete / search) ---
 @app.route("/api/suppliers/search")
 @login_required
@@ -2431,38 +2703,6 @@ def search_suppliers():
     ).fetchall()
 
     return jsonify({"results": [dict(r) for r in rows]})
-
-# --- API Route for Items (Purchase Order autocomplete) ---
-@app.route("/api/purchase-order/items/search")
-@login_required
-def po_search_items():
-    q = request.args.get("q", "").strip()
-    limit = int(request.args.get("limit", 10))
-    page = int(request.args.get("page", 1))
-    offset = (page - 1) * limit
-
-    db = get_db()
-    rows = db.execute(
-        """
-        SELECT
-            id,
-            name,
-            sku,
-            IFNULL(purchase_price, 0) AS purchase_price,
-            IFNULL(gst_rate, 18) AS gst_rate,
-            IFNULL(uom, 'Nos') AS uom,
-            IFNULL(stock_qty, 0) AS stock_qty
-        FROM items
-        WHERE name LIKE ? COLLATE NOCASE
-           OR sku LIKE ? COLLATE NOCASE
-        ORDER BY name
-        LIMIT ? OFFSET ?
-        """,
-        (f"%{q}%", f"%{q}%", limit, offset)
-    ).fetchall()
-
-    return jsonify({"results": [dict(r) for r in rows]})
-
 
 
 
@@ -2526,7 +2766,7 @@ def report_customer_ledger():
             
             # Build query with date filters
             query = """
-                SELECT 'invoice' as type, si.date, si.si_no as reference, si.grand_total as debit, 0 as credit
+                SELECT 'invoice' as type, si.date, si.invoice_no as reference, si.grand_total as debit, 0 as credit
                 FROM sales_invoices si
                 WHERE si.customer_id = ? AND si.status = 'submitted'
                 

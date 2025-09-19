@@ -5,31 +5,31 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>{% if po %}Edit Purchase Order{% else %}New Purchase Order{% endif %}</title>
   <style>
-    body { font-family: Arial, sans-serif; background:#f8f9fa; margin:0; }
-    .container { max-width:1200px; margin:20px auto; background:#fff; padding:20px; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.1); }
-    h1 { margin:0 0 16px; color:#333; }
-    a.button, button { display:inline-block; padding:8px 14px; background:#333; color:#fff; border:none; border-radius:4px; cursor:pointer; text-decoration:none; }
-    a.button:hover, button:hover { background:#555; }
-    .row { margin-bottom:10px; display:flex; gap:10px; align-items:center; }
-    .row label { width:150px; text-align:right; color:#555; }
-    .row input, .row select, .row textarea { flex:1; padding:8px; border:1px solid #ddd; border-radius:4px; }
-    .table-container { overflow-x:auto; margin-top:10px; }
-    table { width:100%; border-collapse:collapse; min-width:800px; }
-    th, td { padding:8px 12px; border:1px solid #ddd; vertical-align:middle; }
-    th { background:#f1f1f1; font-weight:bold; }
-    td input { width:100%; padding:6px; border:1px solid #ddd; border-radius:3px; font-size:14px; box-sizing:border-box; }
-    td input[type="number"] { text-align:right; }
-    .line-total { font-weight:bold; }
-    .remove-btn { background:#dc3545; font-size:12px; }
-    .duplicate-btn { background:#17a2b8; font-size:12px; margin-left:4px; }
-    .search-box { position:relative; }
-    .search-results { position:absolute; top:100%; left:0; right:0; background:#fff; border:1px solid #ddd; max-height:240px; overflow-y:auto; display:none; z-index:1000; }
-    .search-results div { padding:8px; cursor:pointer; }
-    .search-results div:hover { background:#f1f1f1; }
-    .totals-section { margin-top:20px; display:flex; justify-content:flex-end; }
-    .totals-box { background:#f8f9fa; border:1px solid #ddd; border-radius:4px; padding:15px; min-width:300px; }
-    .total-row { display:flex; justify-content:space-between; margin-bottom:8px; }
-    .total-row:last-child { margin-bottom:0; font-size:16px; font-weight:bold; border-top:1px solid #ddd; padding-top:8px; }
+    body { font-family: Arial, sans-serif; background: #f8f9fa; margin: 0; }
+    .container { max-width: 1200px; margin: 20px auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+    h1 { margin: 0 0 16px; color:#333; }
+    a.button, button { display: inline-block; padding: 8px 14px; background: #333; color: #fff; border: none; border-radius: 4px; cursor: pointer; text-decoration: none; font-size:14px; }
+    a.button:hover, button:hover { background: #555; }
+    .row { margin-bottom: 10px; display: flex; gap: 10px; align-items: center; }
+    .row label { width: 150px; text-align: right; color: #555; }
+    .row input, .row textarea { flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
+    .table-container { overflow-x: auto; margin-top: 10px; }
+    table { width: 100%; border-collapse: collapse; min-width: 800px; }
+    th, td { padding: 8px 12px; border: 1px solid #ddd; vertical-align: middle; }
+    th { background: #f1f1f1; font-weight: bold; }
+    td input { width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 3px; font-size: 14px; box-sizing: border-box; }
+    td input[type="number"] { text-align: right; }
+    .line-total { font-weight: bold; }
+    .remove-btn { background: #dc3545; font-size: 12px; margin-right:4px; }
+    .duplicate-btn { background: #17a2b8; font-size: 12px; }
+    .search-box { position: relative; }
+    .search-results { position: absolute; top: 100%; left: 0; right: 0; background: #fff; border: 1px solid #ddd; max-height: 240px; overflow-y: auto; display: none; z-index: 1000; }
+    .search-results div { padding: 8px; cursor: pointer; }
+    .search-results div:hover { background: #f1f1f1; }
+    .totals-section { margin-top: 20px; display: flex; justify-content: flex-end; }
+    .totals-box { background: #f8f9fa; border: 1px solid #ddd; border-radius: 4px; padding: 15px; min-width: 300px; }
+    .total-row { display: flex; justify-content: space-between; margin-bottom: 8px; }
+    .total-row:last-child { margin-bottom: 0; font-size: 16px; font-weight: bold; border-top: 1px solid #ddd; padding-top: 8px; }
     .top-buttons { display:flex; gap:10px; }
   </style>
 </head>
@@ -58,9 +58,9 @@
       </div>
     </div>
 
-     <div class="row">
+    <div class="row">
       <label>Date</label>
-      <input type="date" name="date" value="{{ po.date if so else date_today }}">
+      <input type="date" name="date" value="{{ po.date if po else date_today }}">
     </div>
     <div class="row">
       <label>PO No</label>
@@ -79,7 +79,6 @@
             <th>Item</th>
             <th>Qty</th>
             <th>Rate (₹)</th>
-            <th>Discount (%)</th>
             <th>GST %</th>
             <th>Line Total (₹)</th>
             <th></th>
@@ -108,7 +107,7 @@
 </div>
 
 <script>
-/* Supplier Search */
+/* ---- Supplier Search ---- */
 async function searchSuppliers(query) {
   const baseUrl = `${window.location.protocol}//${window.location.hostname}:5010`;
   const res = await fetch(`${baseUrl}/api/suppliers/search?q=${encodeURIComponent(query)}&limit=10`);
@@ -135,10 +134,11 @@ document.getElementById('supplierSearch').addEventListener('input', async (e) =>
   resultsBox.style.display = data.results.length ? 'block' : 'none';
 });
 
-/* Item Search (reused from SO) */
+/* ---- Item Search ---- */
 async function searchItems(query) {
+  if (!query || query.length < 2) return { results: [] };
   const baseUrl = `${window.location.protocol}//${window.location.hostname}:5010`;
-  const res = await fetch(`${baseUrl}/api/purchase-order/items/search"?q=${encodeURIComponent(query)}&limit=10`);
+  const res = await fetch(`${baseUrl}/api/items/search/purchase?q=${encodeURIComponent(query)}&limit=10`, { cache: "no-store" });
   return await res.json();
 }
 
@@ -168,80 +168,121 @@ function createItemSearch(row, pref={}) {
     results.innerHTML = '';
     if (q.length < 2) { results.style.display = 'none'; return; }
     const data = await searchItems(q);
-    (data.results||[]).forEach(it => {
+    const list = data?.results || [];
+    list.forEach(it => {
       const d = document.createElement('div');
       d.textContent = `${it.name} [${it.sku}]`;
       d.onclick = () => {
         input.value = `${it.name} [${it.sku}]`;
         hidden.value = it.id;
-        row.querySelector('[name="rate[]"]').value = it.purchase_price || 0;
-        row.querySelector('[name="gst[]"]').value = it.gst_rate || 18;
+        row.querySelector('[name="rate[]"]').value = Number(it.cost_price || 0).toFixed(2);
+        row.querySelector('[name="gst[]"]').value = Number(it.gst_rate || 0);
         results.style.display = 'none';
         calcTotals();
       };
       results.appendChild(d);
     });
-    results.style.display = (data.results||[]).length ? 'block' : 'none';
+    results.style.display = list.length ? 'block' : 'none';
   });
 
   return div;
 }
 
-/* Add Row */
+/* ---- Add Row ---- */
 function addRow(pref={}) {
   const tbody = document.getElementById('lines');
   const tr = document.createElement('tr');
 
   const tdItem = document.createElement('td');
-  tdItem.appendChild(createItemSearch(tr, pref)); tr.appendChild(tdItem);
+  tdItem.appendChild(createItemSearch(tr, pref));
+  tr.appendChild(tdItem);
 
-  tr.innerHTML += `
-    <td><input type="number" step="0.01" name="qty[]" value="${pref.qty||1}" required></td>
-    <td><input type="number" step="0.01" name="rate[]" value="${pref.rate||0}" required></td>
-    <td><input type="number" step="0.01" name="discount[]" value="${pref.discount||0}"></td>
-    <td><input type="number" step="0.01" name="gst[]" value="${pref.gst||18}"></td>
-    <td><span class="line-total">0.00</span></td>
-    <td>
-      <button type="button" class="remove-btn">Remove</button>
-      <button type="button" class="duplicate-btn">Duplicate</button>
-    </td>
-  `;
+  const tdQty = document.createElement('td');
+  tdQty.innerHTML = `<input type="number" step="0.01" name="qty[]" value="${pref.qty||1}" required>`;
+  tr.appendChild(tdQty);
 
-  tr.querySelector('.remove-btn').onclick = ()=>{ tr.remove(); calcTotals(); };
-  tr.querySelector('.duplicate-btn').onclick = ()=>{ addRow(pref); };
+  const tdRate = document.createElement('td');
+  tdRate.innerHTML = `<input type="number" step="0.01" name="rate[]" value="${pref.rate||0}" required>`;
+  tr.appendChild(tdRate);
+
+  const tdGst = document.createElement('td');
+  tdGst.innerHTML = `<input type="number" step="0.01" name="gst[]" value="${pref.gst||0}" readonly>`;
+  tr.appendChild(tdGst);
+
+  const tdTotal = document.createElement('td');
+  tdTotal.innerHTML = `<span class="line-total">0.00</span>`;
+  tr.appendChild(tdTotal);
+
+  const tdAct = document.createElement('td');
+  const btnRemove = document.createElement('button');
+  btnRemove.type = 'button';
+  btnRemove.className = 'remove-btn';
+  btnRemove.textContent = 'Remove';
+  btnRemove.onclick = ()=>{ tr.remove(); calcTotals(); };
+
+  const btnDup = document.createElement('button');
+  btnDup.type = 'button';
+  btnDup.className = 'duplicate-btn';
+  btnDup.textContent = 'Duplicate';
+  btnDup.onclick = ()=> addRow({
+    item_id: tr.querySelector('[name="item_id[]"]').value,
+    item_name: tr.querySelector('input[type=text]').value,
+    qty: tr.querySelector('[name="qty[]"]').value,
+    rate: tr.querySelector('[name="rate[]"]').value,
+    gst: tr.querySelector('[name="gst[]"]').value
+  });
+
+  tdAct.appendChild(btnRemove);
+  tdAct.appendChild(btnDup);
+  tr.appendChild(tdAct);
+
+  [tdQty, tdRate].forEach(td=>{
+    td.querySelector('input').addEventListener('input', calcTotals);
+  });
 
   tbody.appendChild(tr);
   calcTotals();
 }
 
-/* Totals */
-function toNumber(v){ v=String(v||'').replace(/,/g,'.'); return parseFloat(v)||0; }
+/* ---- Totals ---- */
+function toNumber(v){ v = String(v||'').replace(/,/g,'.'); return parseFloat(v) || 0; }
 
 function calcTotals() {
-  let total=0, tax=0;
+  let subtotal = 0, tax = 0;
   document.querySelectorAll('#lines tr').forEach(tr=>{
-    let qty=toNumber(tr.querySelector('[name="qty[]"]').value);
-    let rate=toNumber(tr.querySelector('[name="rate[]"]').value);
-    let disc=toNumber(tr.querySelector('[name="discount[]"]').value);
-    let gst=toNumber(tr.querySelector('[name="gst[]"]').value);
+    const qty = toNumber(tr.querySelector('[name="qty[]"]').value);
+    const rate = toNumber(tr.querySelector('[name="rate[]"]').value);
+    const gst = toNumber(tr.querySelector('[name="gst[]"]').value);
 
-    let base=qty*rate;
-    let discounted=base*(1-disc/100);
-    let lineTax=discounted*(gst/100);
-    let lineTotal=discounted+lineTax;
+    const base = qty * rate;
+    const lineTax = base * (gst/100);
+    const lineTotal = base + lineTax;
 
-    total+=discounted; tax+=lineTax;
-
-    tr.querySelector('.line-total').textContent=lineTotal.toFixed(2);
+    subtotal += base;
+    tax += lineTax;
+    tr.querySelector('.line-total').textContent = lineTotal.toFixed(2);
   });
-  document.getElementById('total').textContent=total.toFixed(2);
-  document.getElementById('tax_total').textContent=tax.toFixed(2);
-  document.getElementById('grand_total').textContent=(total+tax).toFixed(2);
+
+  document.getElementById('total').textContent = subtotal.toFixed(2);
+  document.getElementById('tax_total').textContent = tax.toFixed(2);
+  document.getElementById('grand_total').textContent = (subtotal + tax).toFixed(2);
 }
 
-/* Init */
+/* ---- Init ---- */
 window.addEventListener('DOMContentLoaded', ()=>{
-  if(document.querySelectorAll('#lines tr').length===0) addRow({});
+  {% if po and po.items %}
+    {% for li in po.items %}
+      addRow({
+        item_id: "{{ li.item_id }}",
+        item_name: "{{ li.item_name }}",
+        qty: "{{ li.qty }}",
+        rate: "{{ li.rate }}",
+        gst: "{{ li.gst }}"
+      });
+    {% endfor %}
+  {% else %}
+    addRow({});
+  {% endif %}
 });
 </script>
 </body>

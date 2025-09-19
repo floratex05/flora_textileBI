@@ -92,7 +92,8 @@
                 <a href="{{ url_for('salesorder_edit', so_id=so.id) }}">Edit</a>
                 <a href="{{ url_for('salesinvoice_from_so', so_id=so.id) }}">Create Invoice</a>
                 <a href="{{ url_for('salesorder_print', id=so.id) }}">Print</a>
-                <a href="{{ url_for('salesorder_pdf', id=so.id) }}">Download PDF</a>
+                <a href="{{ url_for('salesorder_pdf', id=so.id, download=1 )}}">Download PDF</a>
+                <a href="{{ url_for('salesorder_pdf', id=so.id) }}" target="_blank">View PDF</a>
                 <hr/>
                 <form method="POST" action="{{ url_for('salesorder_delete', id=so.id) }}" onsubmit="return confirm('Delete this Sales Order?')">
                   <button type="submit" style="color:#c62828">Delete</button>
